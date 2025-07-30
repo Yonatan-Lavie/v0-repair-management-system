@@ -2,85 +2,93 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Mail, CheckCircle } from "lucide-react"
-import Link from "next/link"
+import { useState } from "react"
+import { Loader2, Mail } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
-export default function ForgotPassword() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email) {
-      setIsSubmitted(true)
+    setIsLoading(true)
+
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    if (email === "test@example.com") {
+      toast({
+        title: "איפוס סיסמה נשלח",
+        description: "קישור לאיפוס סיסמה נשלח לכתובת המייל שלך.",
+      })
+    } else {
+      toast({
+        title: "שגיאה",
+        description: "כתובת המייל לא נמצאה במערכת.",
+        variant: "destructive",
+      })
     }
+
+    setIsLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2 mb-4">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  חזור לכניסה
-                </Link>
-              </Button>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-primary p-3 rounded-full shadow-md">
+              <Mail className="h-8 w-8 text-primary-foreground" />
             </div>
-            <CardTitle className="text-center">שחזור סיסמה</CardTitle>
-            <CardDescription className="text-center">
-              הכנס את כתובת המייל שלך ונשלח לך קישור לשחזור הסיסמה
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">שכחת סיסמה?</h1>
+          <p className="text-muted-foreground mt-2">הכנס את כתובת המייל שלך לאיפוס הסיסמה.</p>
+        </div>
+
+        <Card className="shadow-lg border-none">
+          <CardHeader>
+            <CardTitle className="text-center text-2xl font-bold text-foreground">איפוס סיסמה</CardTitle>
+            <CardDescription className="text-center text-muted-foreground">
+              הזן את כתובת המייל המשויכת לחשבונך
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!isSubmitted ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">כתובת מייל</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={!email}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  שלח קישור לשחזור
-                </Button>
-              </form>
-            ) : (
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">קישור נשלח!</h3>
-                  <p className="text-gray-600 mt-2">
-                    שלחנו קישור לשחזור סיסמה לכתובת:
-                    <br />
-                    <span className="font-medium">{email}</span>
-                  </p>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-blue-800 text-sm">
-                    בדוק את תיבת המייל שלך (כולל תיקיית ספאם) ולחץ על הקישור לשחזור הסיסמה
-                  </p>
-                </div>
-                <Button variant="outline" asChild className="w-full bg-transparent">
-                  <Link href="/">חזור לכניסה</Link>
-                </Button>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">כתובת מייל</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  disabled={isLoading}
+                  className="text-foreground"
+                />
               </div>
-            )}
+
+              <Button
+                type="submit"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    שולח...
+                  </>
+                ) : (
+                  "שלח קישור איפוס"
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>

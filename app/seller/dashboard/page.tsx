@@ -1,259 +1,128 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ProtectedRoute from "@/components/auth/protected-route"
+import PermissionGuard from "@/components/auth/permission-guard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { QrCode, Plus, Scan, Wrench, Clock } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Clock, CheckCircle, XCircle, Package, PlusCircle } from "lucide-react"
+import { demoData } from "@/lib/demo-data"
+import { statusManager } from "@/lib/status-manager"
+import { getCurrentSession } from "@/app/actions/auth" // Import auth action
+import { redirect } from "next/navigation"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
-// Mock data for seller
-const mockSellerData = {
-  stats: {
-    myRepairs: 8,
-    pendingPickup: 3,
-    completedToday: 2,
-    avgProcessTime: "45 דק",
-  },
-  myRepairs: [
-    {
-      repairId: "REPAIR001",
-      customerName: "רועי כהן",
-      product: "Samsung Galaxy S21",
-      issue: "לא נדלק",
-      status: "ממתין לאיסוף",
-      createdAt: "2025-07-20",
-      qrGenerated: true,
-    },
-    {
-      repairId: "REPAIR004",
-      customerName: "שרה דוד",
-      product: "iPhone 12",
-      issue: "מסך שבור",
-      status: "נשלח לתיקון",
-      createdAt: "2025-07-26",
-      qrGenerated: true,
-    },
-  ],
-}
-
-export default function SellerDashboard() {
-  const [username, setUsername] = useState("")
-
-  useEffect(() => {
-    setUsername(localStorage.getItem("username") || "מוכר")
-  }, [])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ממתין לאיסוף":
-        return "default"
-      case "נשלח לתיקון":
-        return "secondary"
-      case "בתהליך תיקון":
-        return "secondary"
-      case "הושלם":
-        return "outline"
-      default:
-        return "default"
-    }
+export default async function SellerDashboardPage() {
+  const session = await getCurrentSession()
+  if (!session || !session.user.shopId) {
+    redirect("/login")
   }
 
+  const userShopId = session.user.shopId
+  const sellerRepairs = demoData.repairs.filter((r) => r.shopId === userShopId)
+
+  const totalRepairs = sellerRepairs.length
+  const pendingRepairs = sellerRepairs.filter((r) => r.status === "בבדיקה" || r.status === "בתיקון").length
+  const completedRepairs = sellerRepairs.filter((r) => r.status === "הושלם" || r.status === "נמסר").length
+  const cancelledRepairs = sellerRepairs.filter((r) => r.status === "בוטל").length
+
+  const recentRepairs = sellerRepairs
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-3">
-              <QrCode className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">פאנל מוכר</h1>
-                <p className="text-gray-600">שלום, {username}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button asChild>
-                <Link href="/seller/create-repair">
-                  <Plus className="h-4 w-4 mr-2" />
-                  תיקון חדש
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/">יציאה</Link>
-              </Button>
-            </div>
+    <ProtectedRoute allowedRoles={["seller", "shop-manager"]}>
+      <PermissionGuard permission="repairs:read">
+        <div className="container mx-auto py-8 px-4">
+          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">לוח מחוונים - מוכר</h1>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="shadow-md border-none bg-gradient-to-br from-primary/10 to-primary/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">תיקונים בסך הכל</CardTitle>
+                <Package className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{totalRepairs}</div>
+                <p className="text-xs text-muted-foreground">סה"כ תיקונים שנוצרו</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-yellow-100/10 to-yellow-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-yellow-700">תיקונים ממתינים</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{pendingRepairs}</div>
+                <p className="text-xs text-muted-foreground">בבדיקה או בתיקון</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-green-100/10 to-green-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-green-700">תיקונים שהושלמו</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{completedRepairs}</div>
+                <p className="text-xs text-muted-foreground">הושלמו או נמסרו</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-red-100/10 to-red-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-red-700">תיקונים שבוטלו</CardTitle>
+                <XCircle className="h-4 w-4 text-red-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{cancelledRepairs}</div>
+                <p className="text-xs text-muted-foreground">תיקונים שבוטלו</p>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">התיקונים שלי</CardTitle>
-              <Wrench className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockSellerData.stats.myRepairs}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ממתינים לאיסוף</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockSellerData.stats.pendingPickup}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">הושלמו היום</CardTitle>
-              <QrCode className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockSellerData.stats.completedToday}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">זמן ממוצע לטיפול</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockSellerData.stats.avgProcessTime}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                תיקון חדש
-              </CardTitle>
-              <CardDescription>צור בקשת תיקון חדשה עם QR כפול</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" asChild>
-                <Link href="/seller/create-repair">התחל תיקון חדש</Link>
+          <div className="flex justify-end mb-6">
+            <Link href="/seller/create-repair" passHref>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <PlusCircle className="w-4 h-4 ml-2" /> יצירת תיקון חדש
               </Button>
-            </CardContent>
-          </Card>
+            </Link>
+          </div>
 
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+          <Card className="shadow-lg border-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-5 w-5" />
-                סריקת QR
+              <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
+                <Clock className="w-5 h-5" /> תיקונים אחרונים
               </CardTitle>
-              <CardDescription>סרוק QR למעקב או עדכון סטטוס</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full bg-transparent" variant="outline" asChild>
-                <Link href="/seller/scan">פתח סורק</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5" />
-                QR ללקוח
-              </CardTitle>
-              <CardDescription>שלח QR ללקוח או הדפס מחדש</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-transparent" variant="outline">
-                שלח QR
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="my-repairs" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="my-repairs">התיקונים שלי</TabsTrigger>
-            <TabsTrigger value="pending">ממתינים לטיפול</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="my-repairs">
-            <Card>
-              <CardHeader>
-                <CardTitle>התיקונים שלי</CardTitle>
-                <CardDescription>כל התיקונים שיצרתי ואני מטפל בהם</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>מזהה תיקון</TableHead>
-                      <TableHead>לקוח</TableHead>
-                      <TableHead>מוצר</TableHead>
-                      <TableHead>תקלה</TableHead>
-                      <TableHead>סטטוס</TableHead>
-                      <TableHead>תאריך</TableHead>
-                      <TableHead>פעולות</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>מספר תיקון</TableHead>
+                    <TableHead>לקוח</TableHead>
+                    <TableHead>תכשיט</TableHead>
+                    <TableHead>סטטוס</TableHead>
+                    <TableHead>עלות משוערת</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentRepairs.map((repair) => (
+                    <TableRow key={repair.id}>
+                      <TableCell className="font-medium text-foreground">{repair.id}</TableCell>
+                      <TableCell className="text-muted-foreground">{repair.customerName}</TableCell>
+                      <TableCell className="text-muted-foreground">{repair.itemType}</TableCell>
+                      <TableCell>
+                        <Badge className={statusManager.getStatusColorClass(repair.status)}>
+                          {statusManager.getDisplayStatus(repair.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-foreground">₪{repair.estimatedCost.toFixed(2)}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockSellerData.myRepairs.map((repair) => (
-                      <TableRow key={repair.repairId}>
-                        <TableCell className="font-medium">{repair.repairId}</TableCell>
-                        <TableCell>{repair.customerName}</TableCell>
-                        <TableCell>{repair.product}</TableCell>
-                        <TableCell>{repair.issue}</TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(repair.status)}>{repair.status}</Badge>
-                        </TableCell>
-                        <TableCell>{repair.createdAt}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/seller/repair/${repair.repairId}`}>פרטים</Link>
-                            </Button>
-                            {repair.qrGenerated && (
-                              <Button variant="outline" size="sm">
-                                <QrCode className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="pending">
-            <Card>
-              <CardHeader>
-                <CardTitle>ממתינים לטיפול</CardTitle>
-                <CardDescription>תיקונים שחזרו מהמעבדה וממתינים לאיסוף</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">אין תיקונים הממתינים לטיפול כרגע</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </PermissionGuard>
+    </ProtectedRoute>
   )
 }

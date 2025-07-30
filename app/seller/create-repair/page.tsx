@@ -1,299 +1,347 @@
-"use client"
-
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import ProtectedRoute from "@/components/auth/protected-route"
+import PermissionGuard from "@/components/auth/permission-guard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, QrCode, Send, Printer } from "lucide-react"
-import Link from "next/link"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { generateSecureQRURL } from "@/app/actions/qr" // Import QR action
+import { createRepair as createRepairAction } from "@/app/actions/repair" // Assuming a repair action exists
+import { demoData } from "@/lib/demo-data"
+import { getCurrentSession } from "@/app/actions/auth" // Import session action
+import { Gem, ScanLine, User, Tag, Info, QrCode } from "lucide-react"
+import { Loader2 } from "lucide-react" // Declare Loader2 variable
 
-export default function CreateRepair() {
+// This component should be a client component if it uses useState/useRouter
+// For now, assuming it's a client component and will be wrapped by ProtectedRoute
+;("use client")
+
+import type React from "react"
+
+export default function CreateRepairPage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     customerName: "",
     customerPhone: "",
-    productType: "",
-    productBrand: "",
-    productModel: "",
-    issue: "",
-    warrantyStatus: "",
+    customerEmail: "",
+    itemType: "",
+    itemBrand: "",
+    itemModel: "",
+    serialNumber: "",
+    issueDescription: "",
+    estimatedCost: "",
+    status: "בבדיקה",
+    assignedTo: "",
+    shopId: "", // Will be set from session
+  })
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+
+  // Fetch current session on client side
+  useState(() => {
+    const fetchSession = async () => {
+      const session = await getCurrentSession()
+      if (session?.user.shopId) {
+        setFormData((prev) => ({ ...prev, shopId: session.user.shopId }))
+      }
+    }
+    fetchSession()
   })
 
-  const [generatedRepairId, setGeneratedRepairId] = useState("")
-  const [qrCodes, setQrCodes] = useState({
-    product: "",
-    customer: "",
-  })
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { id, value } = e.target
+    setFormData((prev) => ({ ...prev, [id]: value }))
   }
 
-  const handleSubmit = () => {
-    // Generate repair ID
-    const repairId = `REPAIR${String(Date.now()).slice(-3)}`
-    setGeneratedRepairId(repairId)
-
-    // Generate QR codes (mock URLs)
-    setQrCodes({
-      product: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=repair:${repairId};product:PRD${Date.now()};sig:XYZ123`,
-      customer: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=repair:${repairId};cust:CUST${Date.now()};token:TOKEN123`,
-    })
-
-    setStep(3)
+  const handleSelectChange = (id: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [id]: value }))
   }
 
-  const handleComplete = () => {
-    router.push("/seller/dashboard")
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setQrCodeUrl(null)
+
+    try {
+      // Simulate repair creation
+      const newRepair = {
+        id: `REP${Date.now()}`,
+        ...formData,
+        estimatedCost: Number.parseFloat(formData.estimatedCost),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        history: [{ status: "בבדיקה", timestamp: new Date().toISOString(), by: "מערכת" }],
+      }
+
+      // Call server action to create repair
+      const result = await createRepairAction(newRepair) // Assuming this action exists and handles persistence
+
+      if (result.success) {
+        toast({
+          title: "תיקון נוצר בהצלחה!",
+          description: `מספר תיקון: ${newRepair.id}`,
+        })
+
+        // Generate QR code URL using server action
+        const qrUrl = await generateSecureQRURL({
+          repairId: newRepair.id,
+          type: "product",
+          shopId: newRepair.shopId,
+          productType: newRepair.itemType,
+          productBrand: newRepair.itemBrand,
+          productModel: newRepair.itemModel,
+          serialNumber: newRepair.serialNumber,
+        })
+        setQrCodeUrl(qrUrl)
+
+        // Optionally redirect or clear form
+        // router.push(`/seller/repair/${newRepair.id}`);
+        setFormData({
+          customerName: "",
+          customerPhone: "",
+          customerEmail: "",
+          itemType: "",
+          itemBrand: "",
+          itemModel: "",
+          serialNumber: "",
+          issueDescription: "",
+          estimatedCost: "",
+          status: "בבדיקה",
+          assignedTo: "",
+          shopId: formData.shopId, // Keep shopId
+        })
+      } else {
+        toast({
+          title: "שגיאה ביצירת תיקון",
+          description: result.error || "נסה שוב מאוחר יותר.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to create repair:", error)
+      toast({
+        title: "שגיאה בלתי צפויה",
+        description: "אירעה שגיאה בעת יצירת התיקון.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
+
+  const technicians = demoData.users.filter((user) => user.role === "technician" && user.shopId === formData.shopId)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center py-4">
-            <Button variant="ghost" size="sm" asChild className="mr-4">
-              <Link href="/seller/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                חזור
-              </Link>
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900">יצירת תיקון חדש</h1>
-          </div>
-        </div>
-      </div>
+    <ProtectedRoute allowedRoles={["seller", "shop-manager"]}>
+      <PermissionGuard permission="repairs:create">
+        <div className="container mx-auto py-8 px-4">
+          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">יצירת תיקון חדש</h1>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center space-x-4">
-            <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-            >
-              1
-            </div>
-            <div className={`w-16 h-1 ${step >= 2 ? "bg-blue-600" : "bg-gray-200"}`}></div>
-            <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 2 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-            >
-              2
-            </div>
-            <div className={`w-16 h-1 ${step >= 3 ? "bg-blue-600" : "bg-gray-200"}`}></div>
-            <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 3 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-            >
-              3
-            </div>
-          </div>
-        </div>
-
-        {/* Step 1: Customer & Product Info */}
-        {step === 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>פרטי לקוח ומוצר</CardTitle>
-              <CardDescription>הזן את פרטי הלקוח והמוצר לתיקון</CardDescription>
+          <Card className="max-w-3xl mx-auto shadow-lg border-none">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
+                <Gem className="w-6 h-6" /> פרטי תיקון תכשיט
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">שם הלקוח</Label>
-                  <Input
-                    id="customerName"
-                    value={formData.customerName}
-                    onChange={(e) => handleInputChange("customerName", e.target.value)}
-                    placeholder="הכנס שם הלקוח"
-                  />
+            <CardContent className="pt-4">
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Customer Information */}
+                <div className="md:col-span-2 space-y-4 border-b pb-4 mb-4">
+                  <h3 className="text-xl font-semibold text-secondary-foreground flex items-center gap-2">
+                    <User className="w-5 h-5" /> פרטי לקוח
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="customerName">שם לקוח</Label>
+                      <Input
+                        id="customerName"
+                        value={formData.customerName}
+                        onChange={handleInputChange}
+                        required
+                        className="text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerPhone">טלפון</Label>
+                      <Input
+                        id="customerPhone"
+                        type="tel"
+                        value={formData.customerPhone}
+                        onChange={handleInputChange}
+                        required
+                        className="text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerEmail">מייל</Label>
+                      <Input
+                        id="customerEmail"
+                        type="email"
+                        value={formData.customerEmail}
+                        onChange={handleInputChange}
+                        className="text-foreground"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerPhone">טלפון</Label>
-                  <Input
-                    id="customerPhone"
-                    value={formData.customerPhone}
-                    onChange={(e) => handleInputChange("customerPhone", e.target.value)}
-                    placeholder="050-1234567"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="productType">סוג מוצר</Label>
-                  <Select
-                    value={formData.productType}
-                    onValueChange={(value) => handleInputChange("productType", value)}
+                {/* Item Information */}
+                <div className="md:col-span-2 space-y-4 border-b pb-4 mb-4">
+                  <h3 className="text-xl font-semibold text-secondary-foreground flex items-center gap-2">
+                    <Tag className="w-5 h-5" /> פרטי תכשיט
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="itemType">סוג תכשיט</Label>
+                      <Select
+                        onValueChange={(value) => handleSelectChange("itemType", value)}
+                        value={formData.itemType}
+                      >
+                        <SelectTrigger id="itemType" className="text-foreground">
+                          <SelectValue placeholder="בחר סוג תכשיט" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="טבעת">טבעת</SelectItem>
+                          <SelectItem value="שרשרת">שרשרת</SelectItem>
+                          <SelectItem value="עגילים">עגילים</SelectItem>
+                          <SelectItem value="צמיד">צמיד</SelectItem>
+                          <SelectItem value="שעון">שעון</SelectItem>
+                          <SelectItem value="אחר">אחר</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="itemBrand">מותג</Label>
+                      <Input
+                        id="itemBrand"
+                        value={formData.itemBrand}
+                        onChange={handleInputChange}
+                        className="text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="itemModel">דגם</Label>
+                      <Input
+                        id="itemModel"
+                        value={formData.itemModel}
+                        onChange={handleInputChange}
+                        className="text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="serialNumber">מספר סידורי / קטלוגי</Label>
+                      <Input
+                        id="serialNumber"
+                        value={formData.serialNumber}
+                        onChange={handleInputChange}
+                        className="text-foreground"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="issueDescription">תיאור התקלה / דרישת תיקון</Label>
+                    <Textarea
+                      id="issueDescription"
+                      value={formData.issueDescription}
+                      onChange={handleInputChange}
+                      required
+                      rows={4}
+                      className="text-foreground"
+                    />
+                  </div>
+                </div>
+
+                {/* Repair Details */}
+                <div className="md:col-span-2 space-y-4">
+                  <h3 className="text-xl font-semibold text-secondary-foreground flex items-center gap-2">
+                    <Info className="w-5 h-5" /> פרטי תיקון
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="estimatedCost">עלות משוערת (₪)</Label>
+                      <Input
+                        id="estimatedCost"
+                        type="number"
+                        value={formData.estimatedCost}
+                        onChange={handleInputChange}
+                        required
+                        className="text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="assignedTo">צורף/טכנאי אחראי</Label>
+                      <Select
+                        onValueChange={(value) => handleSelectChange("assignedTo", value)}
+                        value={formData.assignedTo}
+                      >
+                        <SelectTrigger id="assignedTo" className="text-foreground">
+                          <SelectValue placeholder="בחר צורף/טכנאי" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {technicians.map((tech) => (
+                            <SelectItem key={tech.id} value={tech.id}>
+                              {tech.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 flex justify-end mt-6">
+                  <Button
+                    type="submit"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    disabled={isLoading}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר סוג מוצר" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="phone">טלפון נייד</SelectItem>
-                      <SelectItem value="tablet">טאבלט</SelectItem>
-                      <SelectItem value="laptop">מחשב נייד</SelectItem>
-                      <SelectItem value="watch">שעון חכם</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        יוצר תיקון...
+                      </>
+                    ) : (
+                      <>
+                        <ScanLine className="w-4 h-4 ml-2" /> יצירת תיקון ו-QR
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="productBrand">מותג</Label>
-                  <Input
-                    id="productBrand"
-                    value={formData.productBrand}
-                    onChange={(e) => handleInputChange("productBrand", e.target.value)}
-                    placeholder="Samsung, Apple, etc."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="productModel">דגם</Label>
-                  <Input
-                    id="productModel"
-                    value={formData.productModel}
-                    onChange={(e) => handleInputChange("productModel", e.target.value)}
-                    placeholder="Galaxy S21, iPhone 13, etc."
-                  />
-                </div>
-              </div>
+              </form>
 
-              <div className="space-y-2">
-                <Label htmlFor="warrantyStatus">סטטוס אחריות</Label>
-                <Select
-                  value={formData.warrantyStatus}
-                  onValueChange={(value) => handleInputChange("warrantyStatus", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר סטטוס אחריות" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in-warranty">באחריות</SelectItem>
-                    <SelectItem value="out-warranty">מחוץ לאחריות</SelectItem>
-                    <SelectItem value="unknown">לא ידוע</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                onClick={() => setStep(2)}
-                className="w-full"
-                disabled={!formData.customerName || !formData.customerPhone || !formData.productType}
-              >
-                המשך לתיאור התקלה
-              </Button>
+              {qrCodeUrl && (
+                <div className="mt-8 p-6 bg-secondary/10 rounded-lg text-center border border-secondary">
+                  <h3 className="text-xl font-semibold text-secondary-foreground mb-4 flex items-center justify-center gap-2">
+                    <QrCode className="w-6 h-6" /> קוד QR לתיקון
+                  </h3>
+                  <p className="text-muted-foreground mb-4">סרוק את הקוד כדי לעקוב אחר התיקון:</p>
+                  <div className="flex justify-center">
+                    <img
+                      src={qrCodeUrl || "/placeholder.svg"}
+                      alt="QR Code for Repair"
+                      className="w-48 h-48 border border-border p-2 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    מספר תיקון: <span className="font-medium text-foreground">{formData.serialNumber}</span>
+                  </p>
+                  <Button
+                    onClick={() => navigator.clipboard.writeText(qrCodeUrl)}
+                    className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    העתק קישור QR
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
-
-        {/* Step 2: Issue Description */}
-        {step === 2 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>תיאור התקלה</CardTitle>
-              <CardDescription>תאר את הבעיה במוצר בפירוט</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="issue">תיאור התקלה</Label>
-                <Textarea
-                  id="issue"
-                  value={formData.issue}
-                  onChange={(e) => handleInputChange("issue", e.target.value)}
-                  placeholder="תאר את הבעיה במוצר - למשל: המסך לא נדלק, יש סדק, הסוללה לא נטענת וכו'"
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  חזור
-                </Button>
-                <Button onClick={handleSubmit} className="flex-1" disabled={!formData.issue}>
-                  צור תיקון ו-QR
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: QR Generation */}
-        {step === 3 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5" />
-                  תיקון נוצר בהצלחה!
-                </CardTitle>
-                <CardDescription>
-                  מזהה תיקון: <span className="font-bold">{generatedRepairId}</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <p className="text-green-800">✅ התיקון נוצר בהצלחה עבור {formData.customerName}</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Product QR */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">QR למוצר</CardTitle>
-                      <CardDescription>להדבקה על השקית</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <img
-                        src={qrCodes.product || "/placeholder.svg"}
-                        alt="QR Code for Product"
-                        className="mx-auto mb-4"
-                      />
-                      <Button variant="outline" className="w-full bg-transparent">
-                        <Printer className="h-4 w-4 mr-2" />
-                        הדפס QR
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  {/* Customer QR */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">QR ללקוח</CardTitle>
-                      <CardDescription>לשליחה ב-SMS</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <img
-                        src={qrCodes.customer || "/placeholder.svg"}
-                        alt="QR Code for Customer"
-                        className="mx-auto mb-4"
-                      />
-                      <Button className="w-full">
-                        <Send className="h-4 w-4 mr-2" />
-                        שלח SMS ללקוח
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">הוראות:</h4>
-                  <ol className="text-blue-800 text-sm space-y-1">
-                    <li>1. הדבק את QR המוצר על השקית</li>
-                    <li>2. שלח את QR הלקוח ב-SMS</li>
-                    <li>3. העבר את המוצר לטכנאי</li>
-                  </ol>
-                </div>
-
-                <Button onClick={handleComplete} className="w-full mt-6">
-                  סיום - חזור לדשבורד
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      </PermissionGuard>
+    </ProtectedRoute>
   )
 }

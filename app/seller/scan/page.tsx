@@ -1,196 +1,452 @@
 "use client"
 
-import { useState } from "react"
+import ProtectedRoute from "@/components/auth/protected-route"
+import PermissionGuard from "@/components/auth/permission-guard"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Scan, QrCode, CheckCircle } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowLeft, Scan, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { qrSecurity } from "@/lib/qr-security"
+import { statusManager } from "@/lib/status-manager"
+import { authManager } from "@/lib/auth"
+import { useToast } from "@/hooks/use-toast"
+import { validateScannedQR } from "@/app/actions/qr" // Import QR action
+import { ScanLine } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
 
-// Mock scan results
-const mockScanResults = {
+// Mock data for demonstration
+const mockRepairData = {
   REPAIR001: {
     repairId: "REPAIR001",
-    customerName: "רועי כהן",
-    product: "Samsung Galaxy S21",
-    issue: "לא נדלק",
-    status: "ממתין לאיסוף",
+    customerName: "דנה כהן",
+    product: "טבעת יהלום",
+    issue: "אבן חסרה",
+    status: "נשלח לתיקון",
     qrType: "product",
+    shopId: "SHOP001",
+    productType: "ring",
+    productBrand: "Tiffany",
+    productModel: "Solitaire",
+    serialNumber: "SN12345",
   },
   REPAIR002: {
     repairId: "REPAIR002",
-    customerName: "מאיה לוי",
-    product: "iPad Pro",
-    issue: "סדק במסך",
+    customerName: "איתי לוי",
+    product: "שרשרת זהב",
+    issue: "סוגר שבור",
     status: "בתהליך תיקון",
     qrType: "customer",
+    shopId: "SHOP001",
+    customerId: "CUST002",
+    customerNameForQR: "איתי לוי",
+  },
+  REPAIR003: {
+    repairId: "REPAIR003",
+    customerName: "שירה גולן",
+    product: "עגילי כסף",
+    issue: "ניקוי והברקה",
+    status: "תוקן - מוכן לשילוח",
+    qrType: "product",
+    shopId: "SHOP001",
+    productType: "earrings",
+    productBrand: "Pandora",
+    productModel: "Hoops",
+    serialNumber: "SN67890",
   },
 }
 
-export default function ScanPage() {
-  const [scanResult, setScanResult] = useState<any>(null)
-  const [scanStep, setScanStep] = useState<"waiting" | "scanned" | "verified">("waiting")
+export default function SellerScanPage() {
+  const router = useRouter()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<string | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [parsedQRData, setParsedQRData] = useState<any>(null)
+  const [repairDetails, setRepairDetails] = useState<any>(null)
+  const [newStatus, setNewStatus] = useState("")
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateMessage, setUpdateMessage] = useState("")
+  const [qrInput, setQrInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
 
-  const simulateScan = (repairId: string) => {
-    const result = mockScanResults[repairId as keyof typeof mockScanResults]
-    if (result) {
-      setScanResult(result)
-      setScanStep("scanned")
+  useEffect(() => {
+    if (scanning) {
+      startScanner()
+    } else {
+      stopScanner()
+    }
+    return () => stopScanner()
+  }, [scanning])
+
+  const startScanner = async () => {
+    setScanResult(null)
+    setScanError(null)
+    setParsedQRData(null)
+    setRepairDetails(null)
+    setNewStatus("")
+    setUpdateMessage("")
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+        // Simulate QR code scanning after a delay
+        setTimeout(() => {
+          const mockQRValue = qrSecurity.generateSecureQRURL({
+            repairId: "REPAIR001",
+            type: "product",
+            shopId: "SHOP001",
+            productType: "ring",
+            productBrand: "Tiffany",
+            productModel: "Solitaire",
+            serialNumber: "SN12345",
+          })
+          handleScan(mockQRValue)
+        }, 3000) // Simulate scan after 3 seconds
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err)
+      setScanError("שגיאה בגישה למצלמה. ודא שההרשאות מצלמה מאושרות.")
+      setScanning(false)
     }
   }
 
-  const handleVerifyDelivery = () => {
-    setScanStep("verified")
+  const stopScanner = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach((track) => track.stop())
+      videoRef.current.srcObject = null
+    }
   }
 
-  const resetScan = () => {
-    setScanResult(null)
-    setScanStep("waiting")
+  const handleScan = async (result?: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const qrValue = result || qrInput
+      const resultData = await validateScannedQR(qrValue) // Call server action
+
+      if (resultData.valid && resultData.data) {
+        toast({
+          title: "QR Code תקין",
+          description: `מזהה תיקון: ${resultData.data.repairId}`,
+        })
+        router.push(`/seller/repair/${resultData.data.repairId}`)
+      } else {
+        setError(resultData.error || "QR Code לא תקין או פג תוקף.")
+        toast({
+          title: "שגיאת סריקה",
+          description: resultData.error || "QR Code לא תקין או פג תוקף.",
+          variant: "destructive",
+        })
+      }
+    } catch (err) {
+      console.error("Error validating QR:", err)
+      setError("שגיאה בתקשורת עם השרת. נסה שוב.")
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בעת אימות ה-QR.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleManualInput = () => {
+    if (qrInput) {
+      handleScan()
+    } else {
+      setScanError("אנא הזן קוד QR לסריקה ידנית.")
+    }
+  }
+
+  const handleStatusUpdate = async () => {
+    if (!repairDetails || !newStatus) return
+
+    setIsUpdating(true)
+    setUpdateMessage("")
+    try {
+      const currentUser = authManager.getCurrentSession()?.user.name || "מוכר לא ידוע"
+      const success = statusManager.updateStatus(repairDetails.repairId, newStatus, currentUser)
+
+      if (success) {
+        setUpdateMessage("✅ סטטוס עודכן בהצלחה!")
+        // Optionally, refresh data or navigate
+        setTimeout(() => router.push("/seller/dashboard"), 1500)
+      } else {
+        setUpdateMessage("❌ שגיאה בעדכון הסטטוס.")
+      }
+    } catch (error) {
+      setUpdateMessage("❌ שגיאה בעדכון הסטטוס.")
+      console.error("Status update error:", error)
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center py-4">
-            <Button variant="ghost" size="sm" asChild className="mr-4">
-              <Link href="/seller/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                חזור
-              </Link>
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900">סריקת QR</h1>
+    <ProtectedRoute allowedRoles={["seller", "shop-manager"]}>
+      <PermissionGuard permission="qr:scan">
+        <div className="min-h-screen bg-background">
+          {/* Header */}
+          <div className="bg-card shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center py-4">
+                <Button variant="ghost" size="sm" asChild className="mr-4 text-muted-foreground hover:text-foreground">
+                  <Link href="/seller/dashboard">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    חזור
+                  </Link>
+                </Button>
+                <h1 className="text-2xl font-bold text-foreground">סריקת QR</h1>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card className="shadow-lg border-none">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                  <ScanLine className="w-6 h-6 text-primary" />
+                  סרוק QR של תכשיט או לקוח
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  השתמש במצלמה לסריקת קוד QR או הזן ידנית
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  {!scanning && !scanResult && (
+                    <Button
+                      onClick={() => setScanning(true)}
+                      className="w-full max-w-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Scan className="h-5 w-5 mr-2" />
+                      התחל סריקה
+                    </Button>
+                  )}
+
+                  {scanning && (
+                    <div className="w-full max-w-md aspect-video bg-black rounded-lg overflow-hidden relative">
+                      <video ref={videoRef} className="w-full h-full object-cover"></video>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-10 w-10 text-white animate-spin" />
+                      </div>
+                      <div className="absolute bottom-4 w-full text-center">
+                        <Button variant="secondary" onClick={() => setScanning(false)}>
+                          עצור סריקה
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!scanning && (
+                    <div className="w-full space-y-2">
+                      <Label htmlFor="manual-qr">הזנה ידנית של קוד QR</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="manual-qr"
+                          placeholder="הכנס קוד QR כאן"
+                          value={qrInput}
+                          onChange={(e) => setQrInput(e.target.value)}
+                          disabled={isLoading}
+                          className="flex-1 text-foreground"
+                        />
+                        <Button
+                          onClick={handleManualInput}
+                          variant="outline"
+                          className="text-muted-foreground hover:text-foreground bg-transparent"
+                        >
+                          אמת
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {scanError && (
+                    <div className="bg-red-50/20 border border-red-200 rounded-lg p-3 text-red-800 w-full">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-5 w-5" />
+                        <p className="font-semibold">{scanError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {parsedQRData && (
+                    <div className="w-full space-y-4">
+                      <div className="bg-green-50/20 border border-green-200 rounded-lg p-3 text-green-800">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5" />
+                          <p className="font-semibold">קוד QR אומת בהצלחה!</p>
+                        </div>
+                      </div>
+
+                      <Card className="shadow-md border-none">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg text-foreground">פרטי QR</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-muted-foreground">
+                          <p>
+                            <strong>מזהה תיקון:</strong>{" "}
+                            <span className="text-foreground">{parsedQRData.repairId}</span>
+                          </p>
+                          <p>
+                            <strong>סוג QR:</strong>{" "}
+                            <span className="text-foreground">
+                              {parsedQRData.type === "product" ? "תכשיט" : "לקוח"}
+                            </span>
+                          </p>
+                          {parsedQRData.shopId && (
+                            <p>
+                              <strong>מזהה חנות:</strong> <span className="text-foreground">{parsedQRData.shopId}</span>
+                            </p>
+                          )}
+                          {parsedQRData.productType && (
+                            <p>
+                              <strong>סוג תכשיט:</strong>{" "}
+                              <span className="text-foreground">{parsedQRData.productType}</span>
+                            </p>
+                          )}
+                          {parsedQRData.productBrand && (
+                            <p>
+                              <strong>מותג:</strong>{" "}
+                              <span className="text-foreground">{parsedQRData.productBrand}</span>
+                            </p>
+                          )}
+                          {parsedQRData.productModel && (
+                            <p>
+                              <strong>דגם:</strong> <span className="text-foreground">{parsedQRData.productModel}</span>
+                            </p>
+                          )}
+                          {parsedQRData.serialNumber && (
+                            <p>
+                              <strong>מספר סידורי:</strong>{" "}
+                              <span className="text-foreground">{parsedQRData.serialNumber}</span>
+                            </p>
+                          )}
+                          {parsedQRData.customerName && (
+                            <p>
+                              <strong>שם לקוח (מ-QR):</strong>{" "}
+                              <span className="text-foreground">{parsedQRData.customerName}</span>
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {repairDetails && (
+                        <Card className="shadow-md border-none">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg text-foreground">פרטי תיקון מהמערכת</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <p>
+                              <strong>לקוח:</strong>{" "}
+                              <span className="text-foreground">{repairDetails.customerName}</span>
+                            </p>
+                            <p>
+                              <strong>תכשיט:</strong> <span className="text-foreground">{repairDetails.product}</span>
+                            </p>
+                            <p>
+                              <strong>תקלה:</strong> <span className="text-foreground">{repairDetails.issue}</span>
+                            </p>
+                            <p>
+                              <strong>סטטוס נוכחי:</strong>{" "}
+                              <Badge variant="secondary" className="text-foreground">
+                                {repairDetails.status}
+                              </Badge>
+                            </p>
+
+                            {parsedQRData.type === "product" && (
+                              <div className="space-y-2">
+                                <Label htmlFor="new-status">עדכן סטטוס תיקון</Label>
+                                <Select value={newStatus} onValueChange={setNewStatus}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="בחר סטטוס חדש" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="נשלח לתיקון">נשלח לתיקון</SelectItem>
+                                    <SelectItem value="ממתין לאיסוף">ממתין לאיסוף</SelectItem>
+                                    <SelectItem value="הושלם">הושלם</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  onClick={handleStatusUpdate}
+                                  className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                                  disabled={!newStatus || isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      מעדכן...
+                                    </>
+                                  ) : (
+                                    "עדכן סטטוס"
+                                  )}
+                                </Button>
+                                {updateMessage && (
+                                  <p
+                                    className={`mt-2 text-center ${updateMessage.startsWith("✅") ? "text-green-600" : "text-red-600"}`}
+                                  >
+                                    {updateMessage}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {parsedQRData.type === "customer" && repairDetails.status === "ממתין לאיסוף" && (
+                              <div className="space-y-2">
+                                <p className="text-lg font-semibold text-green-700">התכשיט מוכן לאיסוף על ידי הלקוח!</p>
+                                <Button
+                                  onClick={() => handleStatusUpdate()} // Assuming "הושלם" means picked up
+                                  className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      מעדכן...
+                                    </>
+                                  ) : (
+                                    "סמן כנאסף"
+                                  )}
+                                </Button>
+                                {updateMessage && (
+                                  <p
+                                    className={`mt-2 text-center ${updateMessage.startsWith("✅") ? "text-green-600" : "text-red-600"}`}
+                                  >
+                                    {updateMessage}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {parsedQRData.type === "customer" && repairDetails.status !== "ממתין לאיסוף" && (
+                              <div className="bg-blue-50/20 border border-blue-200 rounded-lg p-3 text-blue-800">
+                                <p className="font-semibold">
+                                  QR לקוח זה אינו מצביע על תכשיט הממתין לאיסוף. סטטוס נוכחי: {repairDetails.status}
+                                </p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {scanStep === "waiting" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-5 w-5" />
-                סרוק QR Code
-              </CardTitle>
-              <CardDescription>סרוק QR של מוצר או לקוח לעדכון סטטוס או אימות מסירה</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <div className="w-64 h-64 mx-auto border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-6">
-                  <div className="text-center">
-                    <QrCode className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">מקם את המצלמה מול QR Code</p>
-                  </div>
-                </div>
-
-                {/* Demo buttons */}
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600 mb-4">לצורך הדמו - בחר QR לסימולציה:</p>
-                  <div className="flex gap-4 justify-center">
-                    <Button variant="outline" onClick={() => simulateScan("REPAIR001")}>
-                      סרוק QR מוצר (REPAIR001)
-                    </Button>
-                    <Button variant="outline" onClick={() => simulateScan("REPAIR002")}>
-                      סרוק QR לקוח (REPAIR002)
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {scanStep === "scanned" && scanResult && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                QR נסרק בהצלחה
-              </CardTitle>
-              <CardDescription>מזהה תיקון: {scanResult.repairId}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">לקוח</p>
-                    <p className="font-semibold">{scanResult.customerName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">מוצר</p>
-                    <p className="font-semibold">{scanResult.product}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">תקלה</p>
-                    <p className="font-semibold">{scanResult.issue}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">סטטוס נוכחי</p>
-                    <Badge variant="default">{scanResult.status}</Badge>
-                  </div>
-                </div>
-              </div>
-
-              {scanResult.qrType === "product" && scanResult.status === "ממתין לאיסוף" && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 font-semibold mb-2">המוצר מוכן למסירה!</p>
-                    <p className="text-blue-700 text-sm">כעת סרוק את QR הלקוח לאימות זהות ומסירת המוצר</p>
-                  </div>
-                  <Button className="w-full" onClick={handleVerifyDelivery}>
-                    המשך לאימות מסירה
-                  </Button>
-                </div>
-              )}
-
-              {scanResult.qrType === "customer" && (
-                <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-green-800 font-semibold mb-2">זהות לקוח אומתה!</p>
-                    <p className="text-green-700 text-sm">ניתן למסור את המוצר ללקוח</p>
-                  </div>
-                  <Button className="w-full" onClick={handleVerifyDelivery}>
-                    אשר מסירה ללקוח
-                  </Button>
-                </div>
-              )}
-
-              <Button variant="outline" onClick={resetScan} className="w-full bg-transparent">
-                סרוק QR נוסף
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {scanStep === "verified" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                מסירה אושרה בהצלחה!
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">המוצר נמסר ללקוח</h3>
-                <p className="text-gray-600 mb-6">התיקון {scanResult?.repairId} הושלם בהצלחה</p>
-                <div className="flex gap-4">
-                  <Button onClick={resetScan} className="flex-1">
-                    סרוק QR נוסף
-                  </Button>
-                  <Button variant="outline" asChild className="flex-1 bg-transparent">
-                    <Link href="/seller/dashboard">חזור לדשבורד</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
+      </PermissionGuard>
+    </ProtectedRoute>
   )
 }

@@ -1,202 +1,128 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ProtectedRoute from "@/components/auth/protected-route"
+import PermissionGuard from "@/components/auth/permission-guard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Store, Wrench, Clock, CheckCircle, BarChart3 } from "lucide-react"
-import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Clock, CheckCircle, XCircle, Users, Package } from "lucide-react"
+import { demoData } from "@/lib/demo-data"
+import { statusManager } from "@/lib/status-manager"
+import { getCurrentSession } from "@/app/actions/auth" // Import auth actions
+import { redirect } from "next/navigation"
 
-// Mock data for shop
-const mockShopData = {
-  shop: {
-    shopId: "SHOP001",
-    shopName: "FixIt Electronics",
-    location: "תל אביב",
-    manager: "דנה ברק",
-  },
-  stats: {
-    activeRepairs: 12,
-    completedToday: 5,
-    avgRepairTime: "3.2 ימים",
-    customerSatisfaction: "4.8/5",
-  },
-  recentRepairs: [
-    {
-      repairId: "REPAIR001",
-      customerName: "רועי כהן",
-      product: "Samsung Galaxy S21",
-      issue: "לא נדלק",
-      status: "ממתין לאיסוף",
-      createdAt: "2025-07-20",
-      technician: "יוסי בן-חיים",
-    },
-    {
-      repairId: "REPAIR002",
-      customerName: "מאיה לוי",
-      product: "iPad Pro",
-      issue: "סדק במסך",
-      status: "בתהליך תיקון",
-      createdAt: "2025-07-25",
-      technician: "יוסי בן-חיים",
-    },
-    {
-      repairId: "REPAIR003",
-      customerName: "דני אברהם",
-      product: "iPhone 13",
-      issue: "בעיית סוללה",
-      status: "הושלם",
-      createdAt: "2025-07-26",
-      technician: "יוסי בן-חיים",
-    },
-  ],
-  staff: [
-    { name: "מוכר 1", role: "מוכר", activeRepairs: 8 },
-    { name: "מוכר 2", role: "מוכר", activeRepairs: 4 },
-    { name: "יוסי בן-חיים", role: "טכנאי", activeRepairs: 12 },
-  ],
-}
-
-export default function ShopDashboard() {
-  const [username, setUsername] = useState("")
-
-  useEffect(() => {
-    setUsername(localStorage.getItem("username") || "מנהל חנות")
-  }, [])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ממתין לאיסוף":
-        return "default"
-      case "בתהליך תיקון":
-        return "secondary"
-      case "הושלם":
-        return "outline"
-      default:
-        return "default"
-    }
+export default async function ShopDashboardPage() {
+  const session = await getCurrentSession()
+  if (!session || !session.user.shopId) {
+    redirect("/login") // Redirect if no session or no shopId for shop manager
   }
 
+  const userShopId = session.user.shopId
+  const shop = demoData.shops.find((s) => s.id === userShopId)
+
+  if (!shop) {
+    redirect("/unauthorized") // Or handle error if shop not found for user's shopId
+  }
+
+  const shopRepairs = demoData.repairs.filter((r) => r.shopId === userShopId)
+  const shopUsers = demoData.users.filter((u) => u.shopId === userShopId)
+
+  const totalRepairs = shopRepairs.length
+  const pendingRepairs = shopRepairs.filter((r) => r.status === "בבדיקה" || r.status === "בתיקון").length
+  const completedRepairs = shopRepairs.filter((r) => r.status === "הושלם" || r.status === "נמסר").length
+  const cancelledRepairs = shopRepairs.filter((r) => r.status === "בוטל").length
+
+  const recentRepairs = shopRepairs
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-3">
-              <Store className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{mockShopData.shop.shopName}</h1>
-                <p className="text-gray-600">שלום, {username}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/">יציאה</Link>
-              </Button>
-            </div>
+    <ProtectedRoute allowedRoles={["shop-manager"]}>
+      <PermissionGuard permission="shop:read">
+        <div className="container mx-auto py-8 px-4">
+          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">לוח מחוונים - {shop.name}</h1>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="shadow-md border-none bg-gradient-to-br from-primary/10 to-primary/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-primary">תיקונים בסך הכל</CardTitle>
+                <Package className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{totalRepairs}</div>
+                <p className="text-xs text-muted-foreground">סה"כ תיקונים בחנות</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-yellow-100/10 to-yellow-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-yellow-700">תיקונים ממתינים</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{pendingRepairs}</div>
+                <p className="text-xs text-muted-foreground">בבדיקה או בתיקון</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-green-100/10 to-green-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-green-700">תיקונים שהושלמו</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{completedRepairs}</div>
+                <p className="text-xs text-muted-foreground">הושלמו או נמסרו</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md border-none bg-gradient-to-br from-red-100/10 to-red-100/5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-red-700">תיקונים שבוטלו</CardTitle>
+                <XCircle className="h-4 w-4 text-red-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{cancelledRepairs}</div>
+                <p className="text-xs text-muted-foreground">תיקונים שבוטלו</p>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">תיקונים פעילים</CardTitle>
-              <Wrench className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockShopData.stats.activeRepairs}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">הושלמו היום</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockShopData.stats.completedToday}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">זמן ממוצע</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockShopData.stats.avgRepairTime}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">שביעות רצון</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockShopData.stats.customerSatisfaction}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="repairs" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="repairs">תיקונים אחרונים</TabsTrigger>
-            <TabsTrigger value="staff">צוות</TabsTrigger>
-            <TabsTrigger value="reports">דוחות</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="repairs">
-            <Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="shadow-lg border-none">
               <CardHeader>
-                <CardTitle>תיקונים אחרונים</CardTitle>
-                <CardDescription>מעקב אחר כל התיקונים בחנות</CardDescription>
+                <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
+                  <Clock className="w-5 h-5" /> תיקונים אחרונים
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>מזהה תיקון</TableHead>
+                      <TableHead>מספר תיקון</TableHead>
                       <TableHead>לקוח</TableHead>
-                      <TableHead>מוצר</TableHead>
-                      <TableHead>תקלה</TableHead>
+                      <TableHead>תכשיט</TableHead>
                       <TableHead>סטטוס</TableHead>
-                      <TableHead>טכנאי</TableHead>
-                      <TableHead>תאריך</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockShopData.recentRepairs.map((repair) => (
-                      <TableRow key={repair.repairId}>
-                        <TableCell className="font-medium">{repair.repairId}</TableCell>
-                        <TableCell>{repair.customerName}</TableCell>
-                        <TableCell>{repair.product}</TableCell>
-                        <TableCell>{repair.issue}</TableCell>
+                    {recentRepairs.map((repair) => (
+                      <TableRow key={repair.id}>
+                        <TableCell className="font-medium text-foreground">{repair.id}</TableCell>
+                        <TableCell className="text-muted-foreground">{repair.customerName}</TableCell>
+                        <TableCell className="text-muted-foreground">{repair.itemType}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusColor(repair.status)}>{repair.status}</Badge>
+                          <Badge className={statusManager.getStatusColorClass(repair.status)}>
+                            {statusManager.getDisplayStatus(repair.status)}
+                          </Badge>
                         </TableCell>
-                        <TableCell>{repair.technician}</TableCell>
-                        <TableCell>{repair.createdAt}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="staff">
-            <Card>
+            <Card className="shadow-lg border-none">
               <CardHeader>
-                <CardTitle>צוות החנות</CardTitle>
-                <CardDescription>מידע על עובדי החנות ועומס העבודה</CardDescription>
+                <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
+                  <Users className="w-5 h-5" /> צוות החנות
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -204,45 +130,24 @@ export default function ShopDashboard() {
                     <TableRow>
                       <TableHead>שם</TableHead>
                       <TableHead>תפקיד</TableHead>
-                      <TableHead>תיקונים פעילים</TableHead>
-                      <TableHead>פעולות</TableHead>
+                      <TableHead>מייל</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockShopData.staff.map((member, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{member.name}</TableCell>
-                        <TableCell>{member.role}</TableCell>
-                        <TableCell>{member.activeRepairs}</TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm">
-                            צפה בפרטים
-                          </Button>
-                        </TableCell>
+                    {shopUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium text-foreground">{user.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.role}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="reports">
-            <Card>
-              <CardHeader>
-                <CardTitle>דוחות ואנליטיקה</CardTitle>
-                <CardDescription>סטטיסטיקות ודוחות מפורטים</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">דוחות מפורטים יתווספו בגרסה הבאה</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+          </div>
+        </div>
+      </PermissionGuard>
+    </ProtectedRoute>
   )
 }

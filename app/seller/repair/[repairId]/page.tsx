@@ -1,370 +1,381 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import ProtectedRoute from "@/components/auth/protected-route"
+import PermissionGuard from "@/components/auth/permission-guard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, QrCode, Send, Printer, Phone, Mail, Clock, User, Package } from "lucide-react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
+import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import {
+  DollarSign,
+  Clock,
+  CheckCircle,
+  XCircle,
+  User,
+  Tag,
+  Calendar,
+  Info,
+  QrCode,
+  History,
+  Hammer,
+  Package,
+  Loader2,
+} from "lucide-react"
+import { demoData } from "@/lib/demo-data"
+import { statusManager } from "@/lib/status-manager"
+import { notFound, redirect } from "next/navigation"
+import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { updateRepairStatus as updateRepairStatusAction } from "@/app/actions/repair" // Assuming this action exists
+import { generateSecureQRURL } from "@/app/actions/qr" // Import QR action
+import { getCurrentSession, canAccessShop } from "@/app/actions/auth" // Import auth actions
+import {
+  Timeline,
+  TimelineItem,
+  TimelineConnector,
+  TimelineHeader,
+  TimelineIcon,
+  TimelineContent,
+} from "@/components/ui/timeline" // Import timeline components
 
-// Mock detailed repair data
-const mockRepairDetails = {
-  REPAIR001: {
-    repairId: "REPAIR001",
-    customer: {
-      name: "רועי כהן",
-      phone: "+972501234567",
-      email: "roi@example.com",
-    },
-    product: {
-      type: "טלפון נייד",
-      brand: "Samsung",
-      model: "Galaxy S21",
-      color: "שחור",
-      imei: "123456789012345",
-    },
-    issue: {
-      description: "לא נדלק",
-      details: "הלקוח מדווח שהמכשיר לא נדלק לאחר שנפל. נבדק - אין תגובה כלל לחיצה על כפתור ההפעלה.",
-      warranty: "מחוץ לאחריות",
-    },
-    status: "ממתין לאיסוף",
-    createdAt: "2025-07-20T10:30:00Z",
-    createdBy: "מוכר 1",
-    estimatedCost: 350,
-    actualCost: 320,
-    timeline: [
-      { step: "נוצר תיקון", date: "2025-07-20 10:30", user: "מוכר 1", completed: true },
-      { step: "נשלח למעבדה", date: "2025-07-20 14:00", user: "מוכר 1", completed: true },
-      { step: "התקבל במעבדה", date: "2025-07-21 09:15", user: "יוסי בן-חיים", completed: true },
-      { step: "בתהליך תיקון", date: "2025-07-21 11:00", user: "יוסי בן-חיים", completed: true },
-      { step: "תיקון הושלם", date: "2025-07-22 16:30", user: "יוסי בן-חיים", completed: true },
-      { step: "חזר לחנות", date: "2025-07-23 10:00", user: "מוכר 1", completed: true },
-      { step: "מוכן לאיסוף", date: "2025-07-23 10:30", user: "מוכר 1", completed: true },
-    ],
-    qrCodes: {
-      product:
-        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=repair:REPAIR001;product:PRD1001;sig:XYZ123",
-      customer:
-        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=repair:REPAIR001;cust:CUST001;token:TOKEN123",
-    },
-    notes: [
-      { date: "2025-07-20 10:30", user: "מוכר 1", note: "לקוח מדווח על נפילה. בדיקה ראשונית - אין תגובה." },
-      { date: "2025-07-21 11:00", user: "יוסי בן-חיים", note: "זוהתה בעיה בלוח האם. נדרש החלפת רכיב." },
-      { date: "2025-07-22 16:30", user: "יוסי בן-חיים", note: "תיקון הושלם בהצלחה. המכשיר עובד תקין." },
-    ],
-  },
+interface RepairDetailsPageProps {
+  params: {
+    repairId: string
+  }
 }
+// This component should be a client component if it uses useState/useToast
+// For now, assuming it's a client component and will be wrapped by ProtectedRoute
+;("use client")
 
-export default function RepairDetails() {
-  const params = useParams()
-  const repairId = params.repairId as string
-  const [repairData, setRepairData] = useState<any>(null)
+export default function SellerRepairDetailsPage({ params }: RepairDetailsPageProps) {
+  const { toast } = useToast()
+  const [repair, setRepair] = useState(() => demoData.repairs.find((r) => r.id === params.repairId))
+  const [newStatus, setNewStatus] = useState(repair?.status || "")
+  const [statusNotes, setStatusNotes] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
 
-  useEffect(() => {
-    const data = mockRepairDetails[repairId as keyof typeof mockRepairDetails]
-    if (data) {
-      setRepairData(data)
+  // Initial check for repair existence and shop access
+  useState(async () => {
+    if (!repair) {
+      notFound()
     }
-  }, [repairId])
+    const hasAccess = await canAccessShop(repair.shopId)
+    if (!hasAccess) {
+      redirect("/unauthorized")
+    }
+  })
 
-  if (!repairData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center py-8">
-            <p className="text-gray-500">תיקון לא נמצא</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  if (!repair) {
+    return null // Should be handled by notFound() above
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
-      case "ממתין לאיסוף":
-        return "default"
-      case "בתהליך תיקון":
-        return "secondary"
+      case "בבדיקה":
+        return <Clock className="h-4 w-4" />
+      case "בתיקון":
+        return <Hammer className="h-4 w-4" />
       case "הושלם":
-        return "outline"
+        return <CheckCircle className="h-4 w-4" />
+      case "נמסר":
+        return <CheckCircle className="h-4 w-4" />
+      case "בוטל":
+        return <XCircle className="h-4 w-4" />
       default:
-        return "default"
+        return <Info className="h-4 w-4" />
     }
   }
+
+  const handleStatusUpdate = async () => {
+    setIsLoading(true)
+    try {
+      const session = await getCurrentSession()
+      if (!session) {
+        toast({
+          title: "שגיאה",
+          description: "אין סשן פעיל. אנא התחבר מחדש.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      const updatedRepair = {
+        ...repair,
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+        history: [
+          ...repair.history,
+          {
+            status: newStatus,
+            timestamp: new Date().toISOString(),
+            by: session.user.name,
+            notes: statusNotes,
+          },
+        ],
+      }
+
+      // Call server action to update repair status
+      const result = await updateRepairStatusAction(updatedRepair) // Assuming this action exists
+
+      if (result.success) {
+        setRepair(updatedRepair)
+        setStatusNotes("")
+        toast({
+          title: "סטטוס עודכן בהצלחה!",
+          description: `התיקון עודכן לסטטוס: ${statusManager.getDisplayStatus(newStatus)}`,
+        })
+      } else {
+        toast({
+          title: "שגיאה בעדכון סטטוס",
+          description: result.error || "נסה שוב מאוחר יותר.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error)
+      toast({
+        title: "שגיאה בלתי צפויה",
+        description: "אירעה שגיאה בעת עדכון הסטטוס.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGenerateQR = async () => {
+    setIsLoading(true)
+    try {
+      const qrUrl = await generateSecureQRURL({
+        repairId: repair.id,
+        type: "product",
+        shopId: repair.shopId,
+        productType: repair.itemType,
+        productBrand: repair.itemBrand,
+        productModel: repair.itemModel,
+        serialNumber: repair.serialNumber,
+      })
+      setQrCodeUrl(qrUrl)
+      toast({
+        title: "קוד QR נוצר בהצלחה!",
+        description: "הקישור לקוד QR מוכן.",
+      })
+    } catch (error) {
+      console.error("Failed to generate QR:", error)
+      toast({
+        title: "שגיאה ביצירת QR",
+        description: "אירעה שגיאה בעת יצירת קוד ה-QR.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const assignedTechnician = demoData.users.find((u) => u.id === repair.assignedTo)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/seller/dashboard">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  חזור
-                </Link>
-              </Button>
-              <Package className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">פרטי תיקון {repairData.repairId}</h1>
-                <p className="text-gray-600">
-                  {repairData.customer.name} - {repairData.product.brand} {repairData.product.model}
-                </p>
+    <ProtectedRoute allowedRoles={["seller", "shop-manager", "technician"]}>
+      <PermissionGuard permission="repairs:read">
+        <div className="container mx-auto py-8 px-4">
+          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">פרטי תיקון תכשיט</h1>
+
+          <Card className="max-w-4xl mx-auto shadow-lg border-none">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
+                <Package className="w-6 h-6" /> תיקון מספר: {repair.id}
+              </CardTitle>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge className={`${statusManager.getStatusColorClass(repair.status)} text-sm font-medium`}>
+                  {statusManager.getDisplayStatus(repair.status)}
+                </Badge>
               </div>
-            </div>
-            <Badge variant={getStatusColor(repairData.status)} className="text-lg px-4 py-2">
-              {repairData.status}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">עלות משוערת</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₪{repairData.estimatedCost}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">עלות בפועל</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₪{repairData.actualCost}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">זמן בתיקון</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">3 ימים</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">סטטוס אחריות</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-bold">{repairData.issue.warranty}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="details" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="details">פרטי התיקון</TabsTrigger>
-            <TabsTrigger value="timeline">ציר זמן</TabsTrigger>
-            <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
-            <TabsTrigger value="notes">הערות</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Customer Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    פרטי לקוח
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">שם מלא</p>
-                    <p className="font-semibold">{repairData.customer.name}</p>
+            <CardContent className="pt-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Repair Details */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <User className="w-4 h-4" /> שם לקוח:
+                    </p>
+                    <p className="font-medium text-foreground">{repair.customerName}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">טלפון</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold">{repairData.customer.phone}</p>
-                      <Button variant="outline" size="sm">
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <Tag className="w-4 h-4" /> סוג תכשיט:
+                    </p>
+                    <p className="font-medium text-foreground">{repair.itemType}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">מייל</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold">{repairData.customer.email}</p>
-                      <Button variant="outline" size="sm">
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <Info className="w-4 h-4" /> תיאור תקלה:
+                    </p>
+                    <p className="font-medium text-foreground">{repair.issueDescription}</p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Product Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    פרטי מוצר
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">סוג מוצר</p>
-                    <p className="font-semibold">{repairData.product.type}</p>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <DollarSign className="w-4 h-4" /> עלות משוערת:
+                    </p>
+                    <p className="font-medium text-foreground">₪{repair.estimatedCost.toFixed(2)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">מותג ודגם</p>
-                    <p className="font-semibold">
-                      {repairData.product.brand} {repairData.product.model}
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <Calendar className="w-4 h-4" /> תאריך פתיחה:
+                    </p>
+                    <p className="font-medium text-foreground">
+                      {new Date(repair.createdAt).toLocaleDateString("he-IL")}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">צבע</p>
-                    <p className="font-semibold">{repairData.product.color}</p>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
+                      <Calendar className="w-4 h-4" /> עדכון אחרון:
+                    </p>
+                    <p className="font-medium text-foreground">
+                      {new Date(repair.updatedAt).toLocaleDateString("he-IL")}
+                    </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">IMEI</p>
-                    <p className="font-semibold font-mono">{repairData.product.imei}</p>
-                  </div>
-                </CardContent>
-              </Card>
+                  {assignedTechnician && (
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground text-sm flex items-center gap-1">
+                        <User className="w-4 h-4" /> צורף/טכנאי אחראי:
+                      </p>
+                      <p className="font-medium text-foreground">{assignedTechnician.name}</p>
+                    </div>
+                  )}
+                </div>
 
-              {/* Issue Details */}
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>תיאור התקלה</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">תקלה</p>
-                    <p className="font-semibold">{repairData.issue.description}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">פירוט מלא</p>
-                    <p className="text-gray-800">{repairData.issue.details}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">סטטוס אחריות</p>
-                    <Badge variant="secondary">{repairData.issue.warranty}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                <Separator className="my-6 bg-border" />
 
-          <TabsContent value="timeline">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  ציר זמן של התיקון
-                </CardTitle>
-                <CardDescription>מעקב אחר כל השלבים בתהליך התיקון</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {repairData.timeline.map((item: any, index: number) => (
-                    <div key={index} className="flex items-start gap-4">
-                      <div
-                        className={`w-4 h-4 rounded-full mt-1 ${item.completed ? "bg-green-500" : "bg-gray-300"}`}
-                      ></div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className={`font-medium ${item.completed ? "text-gray-900" : "text-gray-500"}`}>
-                            {item.step}
-                          </p>
-                          {item.completed && (
-                            <Badge variant="outline" className="text-xs">
-                              {item.user}
-                            </Badge>
-                          )}
+                {/* Update Status Section */}
+                <PermissionGuard permission="repairs:update" fallback={null}>
+                  <h3 className="text-xl font-bold text-secondary-foreground mb-4 flex items-center gap-2">
+                    <History className="w-5 h-5" /> עדכון סטטוס
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="newStatus">סטטוס חדש</Label>
+                      <Select onValueChange={setNewStatus} value={newStatus}>
+                        <SelectTrigger id="newStatus" className="text-foreground">
+                          <SelectValue placeholder="בחר סטטוס" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusManager.getAllStatuses().map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {statusManager.getDisplayStatus(status)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="statusNotes">הערות (אופציונלי)</Label>
+                      <Textarea
+                        id="statusNotes"
+                        value={statusNotes}
+                        onChange={(e) => setStatusNotes(e.target.value)}
+                        rows={2}
+                        className="text-foreground"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleStatusUpdate}
+                    className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        מעדכן...
+                      </>
+                    ) : (
+                      "עדכן סטטוס"
+                    )}
+                  </Button>
+                </PermissionGuard>
+
+                <Separator className="my-6 bg-border" />
+
+                {/* Repair History Timeline */}
+                <h3 className="text-xl font-bold text-secondary-foreground mb-4">היסטוריית סטטוס</h3>
+                <Timeline>
+                  {repair.history.map((entry, index) => (
+                    <TimelineItem key={index}>
+                      <TimelineConnector />
+                      <TimelineHeader>
+                        <TimelineIcon className="bg-primary text-primary-foreground">
+                          {getStatusIcon(entry.status)}
+                        </TimelineIcon>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-foreground">
+                            {statusManager.getDisplayStatus(entry.status)}
+                          </h4>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(entry.timestamp).toLocaleString("he-IL")}
+                          </span>
                         </div>
-                        {item.date && <p className="text-sm text-gray-600 mt-1">{item.date}</p>}
-                      </div>
-                    </div>
+                      </TimelineHeader>
+                      <TimelineContent className="text-muted-foreground">
+                        {entry.notes && <p>{entry.notes}</p>}
+                        <p className="text-xs">ע"י: {entry.by}</p>
+                      </TimelineContent>
+                    </TimelineItem>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </Timeline>
+              </div>
 
-          <TabsContent value="qr-codes">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Product QR */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <QrCode className="h-5 w-5" />
-                    QR למוצר
-                  </CardTitle>
-                  <CardDescription>QR מודבק על השקית</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center space-y-4">
-                  <img
-                    src={repairData.qrCodes.product || "/placeholder.svg"}
-                    alt="QR Code for Product"
-                    className="mx-auto border-2 border-gray-200 rounded-lg"
-                  />
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Printer className="h-4 w-4 mr-2" />
-                    הדפס QR
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Customer QR */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <QrCode className="h-5 w-5" />
-                    QR ללקוח
-                  </CardTitle>
-                  <CardDescription>QR שנשלח ללקוח</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center space-y-4">
-                  <img
-                    src={repairData.qrCodes.customer || "/placeholder.svg"}
-                    alt="QR Code for Customer"
-                    className="mx-auto border-2 border-gray-200 rounded-lg"
-                  />
-                  <Button className="w-full">
-                    <Send className="h-4 w-4 mr-2" />
-                    שלח SMS מחדש
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="notes">
-            <Card>
-              <CardHeader>
-                <CardTitle>הערות והודעות</CardTitle>
-                <CardDescription>כל ההערות שנוספו במהלך התיקון</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {repairData.notes.map((note: any, index: number) => (
-                    <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-semibold text-sm">{note.user}</p>
-                        <p className="text-xs text-gray-500">{note.date}</p>
-                      </div>
-                      <p className="text-gray-800">{note.note}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+              {/* QR Code Section */}
+              <div className="lg:col-span-1 space-y-6">
+                <PermissionGuard permission="qr:generate" fallback={null}>
+                  <Card className="bg-secondary/10 border border-secondary shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-bold text-secondary-foreground flex items-center gap-2">
+                        <QrCode className="w-5 h-5" /> קוד QR לתיקון
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-muted-foreground text-sm space-y-4">
+                      <p>צור קוד QR ייחודי לתיקון זה כדי לאפשר מעקב קל ללקוחות ולצוות.</p>
+                      <Button
+                        onClick={handleGenerateQR}
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            יוצר...
+                          </>
+                        ) : (
+                          "צור קוד QR"
+                        )}
+                      </Button>
+                      {qrCodeUrl && (
+                        <div className="mt-4 text-center">
+                          <img
+                            src={qrCodeUrl || "/placeholder.svg"}
+                            alt="QR Code for Repair"
+                            className="w-48 h-48 mx-auto border border-border p-2 rounded-md"
+                          />
+                          <Button
+                            onClick={() => navigator.clipboard.writeText(qrCodeUrl)}
+                            className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            העתק קישור QR
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </PermissionGuard>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </PermissionGuard>
+    </ProtectedRoute>
   )
 }

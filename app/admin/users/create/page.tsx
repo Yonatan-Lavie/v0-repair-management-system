@@ -9,13 +9,13 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { createUser as createUserAction } from "@/app/actions/user" // Assuming a user action exists
-import { getCurrentSession } from "@/app/actions/auth" // Import auth action
+import { demoData } from "@/lib/demo-data"
 import { UserPlus, Loader2 } from "lucide-react"
 ;("use client")
 
 import type React from "react"
 
-export default function AddStaffPage() {
+export default function CreateUserPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
@@ -23,28 +23,9 @@ export default function AddStaffPage() {
     name: "",
     email: "",
     password: "",
-    role: "",
-    shopId: "", // Will be set from session
+    role: "admin", // Updated default value
+    shopId: "",
     status: "פעיל",
-  })
-
-  // Fetch current session on client side to get shopId
-  useState(() => {
-    const fetchSession = async () => {
-      const session = await getCurrentSession()
-      if (session?.user.shopId) {
-        setFormData((prev) => ({ ...prev, shopId: session.user.shopId }))
-      } else {
-        // Handle case where shopId is not available (e.g., redirect or show error)
-        toast({
-          title: "שגיאה",
-          description: "לא ניתן להוסיף עובד ללא שיוך לחנות.",
-          variant: "destructive",
-        })
-        router.push("/shop/dashboard") // Redirect back
-      }
-    }
-    fetchSession()
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -61,32 +42,32 @@ export default function AddStaffPage() {
     setIsLoading(true)
 
     try {
-      const newStaffMember = {
+      const newUser = {
         id: `USER${Date.now()}`,
         ...formData,
         permissions: [], // Permissions will be set by role on server
       }
 
-      const result = await createUserAction(newStaffMember) // Call server action
+      const result = await createUserAction(newUser) // Call server action
 
       if (result.success) {
         toast({
-          title: "עובד נוסף בהצלחה!",
-          description: `העובד ${newStaffMember.name} נוסף לחנות.`,
+          title: "משתמש נוצר בהצלחה!",
+          description: `המשתמש ${newUser.name} נוסף למערכת.`,
         })
-        router.push("/shop/dashboard") // Or to a staff list page
+        router.push("/admin/users")
       } else {
         toast({
-          title: "שגיאה בהוספת עובד",
+          title: "שגיאה ביצירת משתמש",
           description: result.error || "נסה שוב מאוחר יותר.",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Failed to add staff member:", error)
+      console.error("Failed to create user:", error)
       toast({
         title: "שגיאה בלתי צפויה",
-        description: "אירעה שגיאה בעת הוספת העובד.",
+        description: "אירעה שגיאה בעת יצירת המשתמש.",
         variant: "destructive",
       })
     } finally {
@@ -95,15 +76,15 @@ export default function AddStaffPage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={["shop-manager"]}>
-      <PermissionGuard permission="staff:write">
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <PermissionGuard permission="users:write">
         <div className="container mx-auto py-8 px-4">
-          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">הוספת עובד חדש לחנות</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">יצירת משתמש חדש</h1>
 
           <Card className="max-w-2xl mx-auto shadow-lg border-none">
             <CardHeader className="pb-4">
               <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
-                <UserPlus className="w-6 h-6" /> פרטי עובד
+                <UserPlus className="w-6 h-6" /> פרטי משתמש
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
@@ -147,12 +128,29 @@ export default function AddStaffPage() {
                       <SelectValue placeholder="בחר תפקיד" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="admin">מנהל מערכת</SelectItem>
+                      <SelectItem value="shop-manager">מנהל חנות</SelectItem>
                       <SelectItem value="seller">מוכר</SelectItem>
                       <SelectItem value="technician">צורף/טכנאי</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {/* ShopId is pre-filled from session, not user input */}
+                <div className="space-y-2">
+                  <Label htmlFor="shopId">חנות (אם רלוונטי)</Label>
+                  <Select onValueChange={(value) => handleSelectChange("shopId", value)} value={formData.shopId}>
+                    <SelectTrigger id="shopId" className="text-foreground">
+                      <SelectValue placeholder="בחר חנות" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">ללא (מנהל מערכת)</SelectItem>
+                      {demoData.shops.map((shop) => (
+                        <SelectItem key={shop.id} value={shop.id}>
+                          {shop.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">סטטוס</Label>
                   <Select
@@ -179,10 +177,10 @@ export default function AddStaffPage() {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        מוסיף עובד...
+                        יוצר משתמש...
                       </>
                     ) : (
-                      "הוסף עובד"
+                      "צור משתמש"
                     )}
                   </Button>
                 </div>
