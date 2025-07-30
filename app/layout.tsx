@@ -6,8 +6,8 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "מערכת ניהול תיקוני תכשיטים - QR כפול",
-  description: "מערכת ניהול ומעקב תיקוני תכשיטים עם אימות QR כפול",
+  title: "מערכת ניהול תיקוני תכשיטים - QR כפול", // Updated title
+  description: "מערכת ניהול ומעקב תיקוני תכשיטים עם אימות QR כפול", // Updated description
     generator: 'v0.dev'
 }
 

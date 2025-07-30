@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Users, Plus, Search, Edit, Trash2, Shield } from "lucide-react" // Added Gem icon
+import { ArrowLeft, Users, Plus, Search, Edit, Trash2, Shield } from "lucide-react"
 import Link from "next/link"
-import { ProtectedRoute } from "@/components/auth/protected-route"
-import { authManager } from "@/lib/auth"
+import { ProtectedRoute } from "@/components/auth/protected-route" // Import ProtectedRoute
+import { authManager } from "@/lib/auth" // Import authManager
 
 // Import the demo data at the top
 import { demoData } from "@/lib/demo-data"
@@ -40,7 +40,7 @@ export default function AllUsers() {
       case "seller":
         return "מוכר"
       case "technician":
-        return "צורף/טכנאי"
+        return "צורף/טכנאי" // Changed label
       default:
         return role
     }
@@ -84,30 +84,30 @@ export default function AllUsers() {
 
   const handleLogout = async () => {
     await authManager.logout()
-    window.location.href = "/login"
+    window.location.href = "/login" // Redirect to login page
   }
 
   return (
     <ProtectedRoute requiredRole="admin" requiredPermissions={["users:read"]}>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="bg-card shadow-sm border-b">
+        <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" asChild>
                   <Link href="/admin/dashboard">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     חזור
                   </Link>
                 </Button>
-                <Users className="h-8 w-8 text-primary" />
+                <Users className="h-8 w-8 text-blue-600" />
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">ניהול משתמשים</h1>
-                  <p className="text-muted-foreground">כל המשתמשים במערכת</p>
+                  <h1 className="text-2xl font-bold text-gray-900">ניהול משתמשים</h1>
+                  <p className="text-gray-600">כל המשתמשים במערכת</p>
                 </div>
               </div>
-              <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Button asChild>
                 <Link href="/admin/users/create">
                   <Plus className="h-4 w-4 mr-2" />
                   הוסף משתמש
@@ -120,41 +120,37 @@ export default function AllUsers() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">סה"כ משתמשים</CardTitle>
-                <Users className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium">סה"כ משתמשים</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{users.length}</div>
+                <div className="text-2xl font-bold">{users.length}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">פעילים</CardTitle>
-                <Users className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium">פעילים</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">
-                  {users.filter((u) => u.status === "פעיל").length}
-                </div>
+                <div className="text-2xl font-bold">{users.filter((u) => u.status === "פעיל").length}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">מנהלי חנויות</CardTitle>
-                <Shield className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium">מנהלי חנויות</CardTitle>
+                <Shield className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">
-                  {users.filter((u) => u.role === "shop-manager").length}
-                </div>
+                <div className="text-2xl font-bold">{users.filter((u) => u.role === "shop-manager").length}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">מוכרים וצורפים/טכנאים</CardTitle>
-                <Users className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium">מוכרים וצורפים/טכנאים</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -165,25 +161,25 @@ export default function AllUsers() {
           </div>
 
           {/* Filters */}
-          <Card className="mb-6 shadow-lg border-none">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-foreground">חיפוס וסינון</CardTitle>
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>חיפוס וסינון</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
                       placeholder="חפש לפי שם או מייל..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 text-foreground"
+                      className="pl-10"
                     />
                   </div>
                 </div>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-48 text-muted-foreground">
+                  <SelectTrigger className="w-48">
                     <SelectValue placeholder="סנן לפי תפקיד" />
                   </SelectTrigger>
                   <SelectContent>
@@ -195,7 +191,7 @@ export default function AllUsers() {
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48 text-muted-foreground">
+                  <SelectTrigger className="w-48">
                     <SelectValue placeholder="סנן לפי סטטוס" />
                   </SelectTrigger>
                   <SelectContent>
@@ -209,10 +205,10 @@ export default function AllUsers() {
           </Card>
 
           {/* Users Table */}
-          <Card className="shadow-lg border-none">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-foreground">רשימת משתמשים</CardTitle>
-              <CardDescription className="text-muted-foreground">
+          <Card>
+            <CardHeader>
+              <CardTitle>רשימת משתמשים</CardTitle>
+              <CardDescription>
                 מציג {filteredUsers.length} מתוך {users.length} משתמשים
               </CardDescription>
             </CardHeader>
@@ -233,31 +229,23 @@ export default function AllUsers() {
                 <TableBody>
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium text-foreground">{user.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={getRoleColor(user.role)}>{getRoleLabel(user.role)}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{user.shop}</TableCell>
+                      <TableCell>{user.shop}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusColor(user.status)}>{user.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{user.lastLogin}</TableCell>
-                      <TableCell className="text-muted-foreground">{user.createdAt}</TableCell>
+                      <TableCell>{user.lastLogin}</TableCell>
+                      <TableCell>{user.createdAt}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-muted-foreground hover:text-foreground bg-transparent"
-                          >
+                          <Button variant="outline" size="sm">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-muted-foreground hover:text-foreground bg-transparent"
-                          >
+                          <Button variant="outline" size="sm">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

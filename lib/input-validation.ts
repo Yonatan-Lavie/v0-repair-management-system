@@ -1,68 +1,103 @@
-export const inputValidation = {
-  /**
-   * Validates an email address.
-   * @param email The email string to validate.
-   * @returns True if the email is valid, false otherwise.
-   */
-  isValidEmail: (email: string): boolean => {
+// Input validation and sanitization
+
+export class InputValidator {
+  // Validate email
+  static isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
-  },
+  }
 
-  /**
-   * Validates a password based on complexity requirements.
-   * Requires at least 8 characters, one uppercase, one lowercase, one number, one special character.
-   * @param password The password string to validate.
-   * @returns True if the password is valid, false otherwise.
-   */
-  isValidPassword: (password: string): boolean => {
-    const minLength = 8
-    const hasUppercase = /[A-Z]/.test(password)
-    const hasLowercase = /[a-z]/.test(password)
-    const hasNumber = /[0-9]/.test(password)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  // Validate phone number (Israeli format)
+  static isValidPhone(phone: string): boolean {
+    const phoneRegex = /^(\+972|0)([23489]|5[0248]|77)[0-9]{7}$/
+    return phoneRegex.test(phone.replace(/[-\s]/g, ""))
+  }
 
-    return password.length >= minLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar
-  },
+  // Validate password strength
+  static validatePassword(password: string): { valid: boolean; errors: string[] } {
+    const errors: string[] = []
 
-  /**
-   * Validates a phone number (simple check for digits and common length).
-   * @param phone The phone number string to validate.
-   * @returns True if the phone number is valid, false otherwise.
-   */
-  isValidPhone: (phone: string): boolean => {
-    const phoneRegex = /^\+?\d{7,15}$/ // Allows optional + and 7-15 digits
-    return phoneRegex.test(phone)
-  },
-
-  /**
-   * Validates a serial number.
-   * Assumes serial numbers can be alphanumeric and typically have a certain length range.
-   * This is a generic validation; specific formats might require more precise regex.
-   * @param serialNumber The serial number string to validate.
-   * @returns True if the serial number is valid, false otherwise.
-   */
-  isValidSerialNumber: (serialNumber: string): boolean => {
-    // Example: alphanumeric, 5 to 20 characters long
-    const serialNumberRegex = /^[a-zA-Z0-9]{5,20}$/
-    return serialNumberRegex.test(serialNumber)
-  },
-
-  /**
-   * Sanitizes a string to prevent XSS attacks.
-   * @param input The string to sanitize.
-   * @returns The sanitized string.
-   */
-  sanitizeString: (input: string): string => {
-    const map: { [key: string]: string } = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#x27;",
-      "/": "&#x2F;",
+    if (password.length < 8) {
+      errors.push("הסיסמה חייבת להכיל לפחות 8 תווים")
     }
-    const reg = /[&<>"'/]/gi
-    return input.replace(reg, (match) => map[match])
-  },
+
+    if (!/[A-Z]/.test(password)) {
+      errors.push("הסיסמה חייבת להכיל לפחות אות גדולה אחת")
+    }
+
+    if (!/[a-z]/.test(password)) {
+      errors.push("הסיסמה חייבת להכיל לפחות אות קטנה אחת")
+    }
+
+    if (!/[0-9]/.test(password)) {
+      errors.push("הסיסמה חייבת להכיל לפחות ספרה אחת")
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      errors.push("הסיסמה חייבת להכיל לפחות תו מיוחד אחד")
+    }
+
+    return { valid: errors.length === 0, errors }
+  }
+
+  // Sanitize HTML input
+  static sanitizeHTML(input: string): string {
+    return input
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;")
+  }
+
+  // Validate repair ID format
+  static isValidRepairId(repairId: string): boolean {
+    const repairIdRegex = /^REPAIR\d{3,6}$/
+    return repairIdRegex.test(repairId)
+  }
+
+  // Validate Serial Number (generic, can be adapted for specific formats)
+  static isValidSerialNumber(serialNumber: string): boolean {
+    // For jewelry, a simple non-empty alphanumeric check might suffice,
+    // or a specific regex if brands have known patterns.
+    // This is a basic example.
+    return serialNumber.trim().length > 0 && /^[a-zA-Z0-9-]+$/.test(serialNumber)
+  }
+
+  // Rate limiting check
+  static checkRateLimit(key: string, maxAttempts: number, windowMs: number): boolean {
+    if (typeof window === "undefined") return true // Skip on server
+
+    const now = Date.now()
+    const attempts = JSON.parse(localStorage.getItem(`rate_limit_${key}`) || "[]")
+
+    // Remove old attempts outside the window
+    const validAttempts = attempts.filter((timestamp: number) => now - timestamp < windowMs)
+
+    if (validAttempts.length >= maxAttempts) {
+      return false // Rate limit exceeded
+    }
+
+    // Add current attempt
+    validAttempts.push(now)
+    localStorage.setItem(`rate_limit_${key}`, JSON.stringify(validAttempts))
+
+    return true
+  }
+
+  // XSS protection
+  static preventXSS(input: string): string {
+    const div = document.createElement("div")
+    div.textContent = input
+    return div.innerHTML
+  }
+
+  // SQL injection prevention (for display purposes)
+  static sanitizeForDisplay(input: string): string {
+    return input
+      .replace(/[<>]/g, "")
+      .replace(/javascript:/gi, "")
+      .replace(/on\w+=/gi, "")
+      .trim()
+  }
 }

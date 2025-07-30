@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, QrCode, Send, Printer } from "lucide-react" // Added Gem icon
+import { ArrowLeft, QrCode, Send, Printer } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { qrSecurity } from "@/lib/qr-security"
-import { authManager } from "@/lib/auth"
+import { qrSecurity } from "@/lib/qr-security" // Import qrSecurity
+import { authManager } from "@/lib/auth" // Import authManager
 
 export default function CreateRepair() {
   const router = useRouter()
@@ -22,9 +22,9 @@ export default function CreateRepair() {
     productType: "",
     productBrand: "",
     productModel: "",
-    material: "",
-    gemstone: "",
-    serialNumber: "",
+    material: "", // New field for jewelry
+    gemstone: "", // New field for jewelry
+    serialNumber: "", // Changed from IMEI
     issue: "",
     warrantyStatus: "",
   })
@@ -40,12 +40,14 @@ export default function CreateRepair() {
   }
 
   const handleSubmit = () => {
-    const repairId = `REPAIR${String(Date.now()).slice(-6)}`
+    // Generate repair ID
+    const repairId = `REPAIR${String(Date.now()).slice(-6)}` // More digits for uniqueness
     setGeneratedRepairId(repairId)
 
     const session = authManager.getCurrentSession()
     const shopId = session?.user.shopId || "UNKNOWN_SHOP"
 
+    // Generate secure QR codes
     const productQRData = qrSecurity.generateSecureQRURL({
       repairId,
       type: "product",
@@ -60,8 +62,8 @@ export default function CreateRepair() {
       repairId,
       type: "customer",
       shopId,
-      customerId: "CUST_NEW",
-      customerName: formData.customerName,
+      customerId: "CUST_NEW", // Placeholder for new customer ID
+      customerName: formData.customerName, // Pass customer name for display in QR data
     })
 
     setQrCodes({
@@ -77,18 +79,18 @@ export default function CreateRepair() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-card shadow-sm border-b">
+      <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center py-4">
-            <Button variant="ghost" size="sm" asChild className="mr-4 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" asChild className="mr-4">
               <Link href="/seller/dashboard">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 חזור
               </Link>
             </Button>
-            <h1 className="text-2xl font-bold text-foreground">יצירת תיקון חדש</h1>
+            <h1 className="text-2xl font-bold text-gray-900">יצירת תיקון חדש</h1>
           </div>
         </div>
       </div>
@@ -98,19 +100,19 @@ export default function CreateRepair() {
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center space-x-4">
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step >= 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
             >
               1
             </div>
-            <div className={`w-16 h-1 ${step >= 2 ? "bg-primary" : "bg-muted"}`}></div>
+            <div className={`w-16 h-1 ${step >= 2 ? "bg-blue-600" : "bg-gray-200"}`}></div>
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step >= 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 2 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
             >
               2
             </div>
-            <div className={`w-16 h-1 ${step >= 3 ? "bg-primary" : "bg-muted"}`}></div>
+            <div className={`w-16 h-1 ${step >= 3 ? "bg-blue-600" : "bg-gray-200"}`}></div>
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${step >= 3 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 3 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
             >
               3
             </div>
@@ -119,10 +121,10 @@ export default function CreateRepair() {
 
         {/* Step 1: Customer & Product Info */}
         {step === 1 && (
-          <Card className="shadow-lg border-none">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-foreground">פרטי לקוח ותכשיט</CardTitle>
-              <CardDescription className="text-muted-foreground">הזן את פרטי הלקוח והתכשיט לתיקון</CardDescription>
+          <Card>
+            <CardHeader>
+              <CardTitle>פרטי לקוח ותכשיט</CardTitle>
+              <CardDescription>הזן את פרטי הלקוח והתכשיט לתיקון</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -242,7 +244,7 @@ export default function CreateRepair() {
 
               <Button
                 onClick={() => setStep(2)}
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                className="w-full"
                 disabled={!formData.customerName || !formData.customerPhone || !formData.productType}
               >
                 המשך לתיאור התקלה
@@ -253,10 +255,10 @@ export default function CreateRepair() {
 
         {/* Step 2: Issue Description */}
         {step === 2 && (
-          <Card className="shadow-lg border-none">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-foreground">תיאור התקלה</CardTitle>
-              <CardDescription className="text-muted-foreground">תאר את הבעיה בתכשיט בפירוט</CardDescription>
+          <Card>
+            <CardHeader>
+              <CardTitle>תיאור התקלה</CardTitle>
+              <CardDescription>תאר את הבעיה בתכשיט בפירוט</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -271,18 +273,10 @@ export default function CreateRepair() {
               </div>
 
               <div className="flex gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
+                <Button variant="outline" onClick={() => setStep(1)}>
                   חזור
                 </Button>
-                <Button
-                  onClick={handleSubmit}
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={!formData.issue}
-                >
+                <Button onClick={handleSubmit} className="flex-1" disabled={!formData.issue}>
                   צור תיקון ו-QR
                 </Button>
               </div>
@@ -293,38 +287,35 @@ export default function CreateRepair() {
         {/* Step 3: QR Generation */}
         {step === 3 && (
           <div className="space-y-6">
-            <Card className="shadow-lg border-none">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                  <QrCode className="h-6 w-6 text-primary" />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
                   תיקון נוצר בהצלחה!
                 </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  מזהה תיקון: <span className="font-bold text-foreground">{generatedRepairId}</span>
+                <CardDescription>
+                  מזהה תיקון: <span className="font-bold">{generatedRepairId}</span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="bg-green-50/20 border border-green-200 rounded-lg p-4 mb-6 text-green-800">
-                  <p className="font-semibold">✅ התיקון נוצר בהצלחה עבור {formData.customerName}</p>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <p className="text-green-800">✅ התיקון נוצר בהצלחה עבור {formData.customerName}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Product QR */}
-                  <Card className="shadow-md border-none">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg text-foreground">QR לתכשיט</CardTitle>
-                      <CardDescription className="text-muted-foreground">להדבקה על השקית</CardDescription>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">QR לתכשיט</CardTitle>
+                      <CardDescription>להדבקה על השקית</CardDescription>
                     </CardHeader>
                     <CardContent className="text-center">
                       <img
                         src={qrCodes.product || "/placeholder.svg"}
                         alt="QR Code for Product"
-                        className="mx-auto mb-4 border border-muted rounded-lg p-2"
+                        className="mx-auto mb-4"
                       />
-                      <Button
-                        variant="outline"
-                        className="w-full text-primary hover:text-primary-foreground hover:bg-primary bg-transparent"
-                      >
+                      <Button variant="outline" className="w-full bg-transparent">
                         <Printer className="h-4 w-4 mr-2" />
                         הדפס QR
                       </Button>
@@ -332,18 +323,18 @@ export default function CreateRepair() {
                   </Card>
 
                   {/* Customer QR */}
-                  <Card className="shadow-md border-none">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg text-foreground">QR ללקוח</CardTitle>
-                      <CardDescription className="text-muted-foreground">לשליחה ב-SMS</CardDescription>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">QR ללקוח</CardTitle>
+                      <CardDescription>לשליחה ב-SMS</CardDescription>
                     </CardHeader>
                     <CardContent className="text-center">
                       <img
                         src={qrCodes.customer || "/placeholder.svg"}
                         alt="QR Code for Customer"
-                        className="mx-auto mb-4 border border-muted rounded-lg p-2"
+                        className="mx-auto mb-4"
                       />
-                      <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                      <Button className="w-full">
                         <Send className="h-4 w-4 mr-2" />
                         שלח SMS ללקוח
                       </Button>
@@ -351,19 +342,16 @@ export default function CreateRepair() {
                   </Card>
                 </div>
 
-                <div className="mt-6 p-4 bg-secondary/20 border border-secondary rounded-lg text-secondary-foreground">
-                  <h4 className="font-semibold mb-2">הוראות:</h4>
-                  <ol className="text-sm space-y-1">
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">הוראות:</h4>
+                  <ol className="text-blue-800 text-sm space-y-1">
                     <li>1. הדבק את QR התכשיט על השקית</li>
                     <li>2. שלח את QR הלקוח ב-SMS</li>
                     <li>3. העבר את התכשיט לצורף/טכנאי</li>
                   </ol>
                 </div>
 
-                <Button
-                  onClick={handleComplete}
-                  className="w-full mt-6 bg-primary text-primary-foreground hover:bg-primary/90"
-                >
+                <Button onClick={handleComplete} className="w-full mt-6">
                   סיום - חזור לדשבורד
                 </Button>
               </CardContent>

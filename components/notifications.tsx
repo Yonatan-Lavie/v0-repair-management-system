@@ -68,18 +68,13 @@ export function NotificationCenter() {
       case "error":
         return <AlertTriangle className="h-4 w-4 text-red-600" />
       default:
-        return <Info className="h-4 w-4 text-primary" /> // Changed info icon color
+        return <Info className="h-4 w-4 text-blue-600" />
     }
   }
 
   return (
     <div className="relative">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative text-muted-foreground hover:text-foreground"
-      >
+      <Button variant="outline" size="sm" onClick={() => setIsOpen(!isOpen)} className="relative">
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
           <Badge
@@ -92,18 +87,11 @@ export function NotificationCenter() {
       </Button>
 
       {isOpen && (
-        <Card className="absolute top-12 right-0 w-80 z-50 shadow-lg border-none">
-          {" "}
-          {/* Added shadow and removed border */}
+        <Card className="absolute top-12 right-0 w-80 z-50 shadow-lg">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg text-foreground">התראות</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
+              <CardTitle className="text-lg">התראות</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -111,20 +99,20 @@ export function NotificationCenter() {
           <CardContent className="p-0">
             <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">אין התראות חדשות</div>
+                <div className="p-4 text-center text-gray-500">אין התראות חדשות</div>
               ) : (
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-muted hover:bg-muted/50 ${!notification.read ? "bg-secondary/10" : ""}`} // Changed background to secondary/10
+                    className={`p-4 border-b hover:bg-gray-50 ${!notification.read ? "bg-blue-50" : ""}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3 flex-1">
                         {getIcon(notification.type)}
                         <div className="flex-1">
-                          <h4 className="font-medium text-foreground text-sm">{notification.title}</h4>
-                          <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
-                          <p className="text-xs text-muted-foreground mt-2">{notification.timestamp}</p>
+                          <h4 className="font-medium text-sm">{notification.title}</h4>
+                          <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                          <p className="text-xs text-gray-400 mt-2">{notification.timestamp}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -133,7 +121,7 @@ export function NotificationCenter() {
                             variant="ghost"
                             size="sm"
                             onClick={() => markAsRead(notification.id)}
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            className="h-6 w-6 p-0"
                           >
                             <CheckCircle className="h-3 w-3" />
                           </Button>
@@ -142,7 +130,7 @@ export function NotificationCenter() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeNotification(notification.id)}
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          className="h-6 w-6 p-0"
                         >
                           <X className="h-3 w-3" />
                         </Button>

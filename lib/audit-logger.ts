@@ -1,60 +1,186 @@
-interface AuditLogEntry {
+// Audit logging system
+
+export interface AuditLog {
+  id: string
   timestamp: string
-  userId: string
-  userName: string
+  userId?: string
+  userEmail?: string
   action: string
-  details: Record<string, any>
+  resource: string
+  resourceId?: string
+  details: any
   ipAddress?: string
+  userAgent?: string
+  success: boolean
+  errorMessage?: string
 }
 
-// In a real application, this would interact with a database or a dedicated logging service.
-// For this demo, we'll just log to the console and keep a small in-memory array.
-const auditLogs: AuditLogEntry[] = []
-const MAX_LOGS = 100
+class AuditLogger {
+  private static instance: AuditLogger
+  private logs: AuditLog[] = []
 
-export const auditLogger = {
-  /**
-   * Logs an audit event.
-   * @param userId The ID of the user performing the action.
-   * @param userName The name of the user performing the action.
-   * @param action A description of the action performed (e.g., "User Login", "Repair Status Update").
-   * @param details An object containing additional context for the action.
-   * @param ipAddress (Optional) The IP address from which the action originated.
-   */
-  log: (userId: string, userName: string, action: string, details: Record<string, any>, ipAddress?: string) => {
-    const timestamp = new Date().toISOString()
-    const logEntry: AuditLogEntry = {
-      timestamp,
+  static getInstance(): AuditLogger {
+    if (!AuditLogger.instance) {
+      AuditLogger.instance = new AuditLogger()
+    }
+    return AuditLogger.instance
+  }
+
+  // Log user action
+  log(params: {
+    action: string
+    resource: string
+    resourceId?: string
+    details?: any
+    success?: boolean
+    errorMessage?: string
+    userId?: string
+    userEmail?: string
+  }): void {
+    const logEntry: AuditLog = {
+      id: this.generateId(),
+      timestamp: new Date().toISOString(),
+      userId: params.userId,
+      userEmail: params.userEmail,
+      action: params.action,
+      resource: params.resource,
+      resourceId: params.resourceId,
+      details: params.details || {},
+      ipAddress: this.getClientIP(),
+      userAgent: this.getUserAgent(),
+      success: params.success !== false,
+      errorMessage: params.errorMessage,
+    }
+
+    this.logs.push(logEntry)
+    this.persistLog(logEntry)
+
+    // In production, send to logging service
+    console.log("Audit Log:", logEntry)
+  }
+
+  // Log authentication events
+  logAuth(event: "login" | "logout" | "login_failed", userId?: string, email?: string, details?: any): void {
+    this.log({
+      action: event,
+      resource: "authentication",
       userId,
-      userName,
-      action,
+      userEmail: email,
       details,
-      ipAddress,
+      success: event !== "login_failed",
+    })
+  }
+
+  // Log repair actions
+  logRepair(action: string, repairId: string, userId?: string, details?: any): void {
+    this.log({
+      action,
+      resource: "repair",
+      resourceId: repairId,
+      userId,
+      details,
+    })
+  }
+
+  // Log user management actions
+  logUserManagement(action: string, targetUserId: string, adminUserId?: string, details?: any): void {
+    this.log({
+      action,
+      resource: "user",
+      resourceId: targetUserId,
+      userId: adminUserId,
+      details,
+    })
+  }
+
+  // Log security events
+  logSecurity(event: string, details: any, userId?: string): void {
+    this.log({
+      action: event,
+      resource: "security",
+      userId,
+      details,
+      success: !event.includes("failed") && !event.includes("blocked"),
+    })
+  }
+
+  // Get logs with filtering
+  getLogs(filters?: {
+    userId?: string
+    action?: string
+    resource?: string
+    startDate?: string
+    endDate?: string
+    success?: boolean
+  }): AuditLog[] {
+    let filteredLogs = [...this.logs]
+
+    if (filters) {
+      if (filters.userId) {
+        filteredLogs = filteredLogs.filter((log) => log.userId === filters.userId)
+      }
+      if (filters.action) {
+        filteredLogs = filteredLogs.filter((log) => log.action.includes(filters.action!))
+      }
+      if (filters.resource) {
+        filteredLogs = filteredLogs.filter((log) => log.resource === filters.resource)
+      }
+      if (filters.startDate) {
+        filteredLogs = filteredLogs.filter((log) => log.timestamp >= filters.startDate!)
+      }
+      if (filters.endDate) {
+        filteredLogs = filteredLogs.filter((log) => log.timestamp <= filters.endDate!)
+      }
+      if (filters.success !== undefined) {
+        filteredLogs = filteredLogs.filter((log) => log.success === filters.success)
+      }
     }
 
-    auditLogs.push(logEntry)
-    if (auditLogs.length > MAX_LOGS) {
-      auditLogs.shift() // Remove the oldest log if max limit is reached
+    return filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }
+
+  // Generate unique ID
+  private generateId(): string {
+    return `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  // Get client IP (mock for demo)
+  private getClientIP(): string {
+    // In a real app, get from request headers
+    return "127.0.0.1"
+  }
+
+  // Get user agent
+  private getUserAgent(): string {
+    if (typeof window !== "undefined") {
+      return window.navigator.userAgent
     }
+    return "Unknown"
+  }
 
-    console.log("AUDIT LOG:", logEntry)
-  },
+  // Persist log (mock implementation)
+  private persistLog(log: AuditLog): void {
+    // In a real app, send to database or logging service
+    if (typeof window !== "undefined") {
+      const existingLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]")
+      existingLogs.push(log)
 
-  /**
-   * Retrieves all current audit logs.
-   * In a real system, this would involve querying the database.
-   * @returns An array of audit log entries.
-   */
-  getLogs: (): AuditLogEntry[] => {
-    return [...auditLogs] // Return a copy to prevent external modification
-  },
+      // Keep only last 1000 logs in localStorage
+      if (existingLogs.length > 1000) {
+        existingLogs.splice(0, existingLogs.length - 1000)
+      }
 
-  /**
-   * Clears all audit logs.
-   * (For development/testing purposes only, not for production).
-   */
-  clearLogs: () => {
-    auditLogs.length = 0
-    console.log("AUDIT LOGS CLEARED.")
-  },
+      localStorage.setItem("audit_logs", JSON.stringify(existingLogs))
+    }
+  }
+
+  // Load persisted logs
+  loadPersistedLogs(): void {
+    if (typeof window !== "undefined") {
+      const persistedLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]")
+      this.logs = persistedLogs
+    }
+  }
 }
+
+export const auditLogger = AuditLogger.getInstance()

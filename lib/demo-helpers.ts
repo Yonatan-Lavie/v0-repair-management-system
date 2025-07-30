@@ -1,5 +1,3 @@
-import { getDemoData } from "./demo-data"
-
 export const demoHelpers = {
   // Generate realistic timestamps
   generateTimestamp: (daysAgo: number, hour = 10, minute = 0) => {
@@ -107,29 +105,32 @@ export const demoHelpers = {
   },
 
   // Calculate estimated completion - adapted for jewelry issues
-  calculateEstimatedCompletion: (issue: string, productType: string): string => {
-    let baseDays = 3 // Default for general jewelry repair
+  calculateEstimatedCompletion: (issueType: string, priority: string) => {
+    const baseDays = {
+      "שריטות/פגמים במתכת": 2,
+      "אבן חסרה/רופפת": 3,
+      "תיקון סוגר/שרשרת": 1,
+      "ניקוי וליטוש": 1,
+      "הקטנה/הגדלה": 2,
+      "החלפת סוללה (שעון)": 1,
+      אחר: 3,
+    }
 
-    if (issue.includes("אבן חסרה") || issue.includes("שיבוץ")) {
-      baseDays += 5 // More time for stone replacement/setting
+    const priorityMultiplier = {
+      נמוך: 1.5,
+      רגיל: 1,
+      גבוה: 0.7,
+      דחוף: 0.5,
     }
-    if (issue.includes("שריטה") || issue.includes("ליטוש")) {
-      baseDays += 2 // Polishing and scratch removal
-    }
-    if (issue.includes("ניקוי") || issue.includes("הברקה")) {
-      baseDays += 1 // Simple cleaning
-    }
-    if (issue.includes("סוגר שבור") || issue.includes("תיקון שרשרת")) {
-      baseDays += 3 // Chain/clasp repair
-    }
-    if (productType === "שעון יוקרה") {
-      baseDays += 7 // Watches often require specialized attention
-    }
+
+    const base = baseDays[issueType as keyof typeof baseDays] || 3
+    const multiplier = priorityMultiplier[priority as keyof typeof priorityMultiplier] || 1
+    const estimatedDays = Math.ceil(base * multiplier)
 
     const completionDate = new Date()
-    completionDate.setDate(completionDate.getDate() + baseDays)
+    completionDate.setDate(completionDate.getDate() + estimatedDays)
 
-    return completionDate.toLocaleDateString("he-IL")
+    return completionDate.toISOString().split("T")[0]
   },
 
   // Generate repair statistics
@@ -155,28 +156,5 @@ export const demoHelpers = {
       completionRate: total > 0 ? ((completed / total) * 100).toFixed(1) : "0",
       avgTime: avgTime.toFixed(1),
     }
-  },
-
-  // Get repair status history
-  getRepairStatusHistory: (repairId: string) => {
-    const repair = getDemoData.getRepair(repairId)
-    if (!repair) return []
-
-    const timeline = getDemoData.repairTimelines[repairId] || []
-    return timeline.map((event) => ({
-      status: event.step,
-      date: event.date,
-      user: event.user,
-    }))
-  },
-
-  // Get product details
-  getProductDetails: (productId: string) => {
-    return getDemoData.getProduct(productId)
-  },
-
-  // Get customer details
-  getCustomerDetails: (customerId: string) => {
-    return getDemoData.getCustomer(customerId)
   },
 }

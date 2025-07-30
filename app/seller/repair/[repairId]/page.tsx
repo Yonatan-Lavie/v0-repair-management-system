@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, QrCode, Send, Printer, Phone, Mail, Clock, User, Gem } from "lucide-react" // Added Gem icon
+import { ArrowLeft, QrCode, Send, Printer, Phone, Mail, Clock, User, Package } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ProtectedRoute } from "@/components/auth/protected-route"
-import { qrSecurity } from "@/lib/qr-security"
+import { ProtectedRoute } from "@/components/auth/protected-route" // Import ProtectedRoute
+import { qrSecurity } from "@/lib/qr-security" // Import qrSecurity
 
 // Import the demo data at the top
 import { demoData, getDemoData } from "@/lib/demo-data"
@@ -30,9 +30,9 @@ const mockRepairDetails = Object.fromEntries(
           brand: product?.brand || "לא ידוע",
           model: product?.model || "לא ידוע",
           color: product?.color || "לא ידוע",
-          material: (product as any)?.material || "לא ידוע",
-          gemstone: (product as any)?.gemstone || "לא ידוע",
-          serialNumber: (product as any)?.serialNumber || "לא ידוע",
+          material: (product as any)?.material || "לא ידוע", // Added material
+          gemstone: (product as any)?.gemstone || "לא ידוע", // Added gemstone
+          serialNumber: (product as any)?.serialNumber || "לא ידוע", // Changed from IMEI
         },
         issue: {
           description: repair.issue,
@@ -86,10 +86,10 @@ export default function RepairDetails() {
 
   if (!repairData) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md shadow-lg border-none">
-          <CardContent className="text-center py-8 text-muted-foreground">
-            <p>תיקון לא נמצא</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">תיקון לא נמצא</p>
           </CardContent>
         </Card>
       </div>
@@ -111,27 +111,27 @@ export default function RepairDetails() {
 
   return (
     <ProtectedRoute requiredRole="seller">
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="bg-card shadow-sm border-b">
+        <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" asChild>
                   <Link href="/seller/dashboard">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     חזור
                   </Link>
                 </Button>
-                <Gem className="h-8 w-8 text-primary" /> {/* Changed icon to Gem */}
+                <Package className="h-8 w-8 text-blue-600" />
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">פרטי תיקון {repairData.repairId}</h1>
-                  <p className="text-muted-foreground">
+                  <h1 className="text-2xl font-bold text-gray-900">פרטי תיקון {repairData.repairId}</h1>
+                  <p className="text-gray-600">
                     {repairData.customer.name} - {repairData.product.brand} {repairData.product.model}
                   </p>
                 </div>
               </div>
-              <Badge variant={getStatusColor(repairData.status)} className="text-lg px-4 py-2 font-semibold">
+              <Badge variant={getStatusColor(repairData.status)} className="text-lg px-4 py-2">
                 {repairData.status}
               </Badge>
             </div>
@@ -141,106 +141,78 @@ export default function RepairDetails() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Quick Info Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">עלות משוערת</CardTitle>
+                <CardTitle className="text-sm font-medium">עלות משוערת</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">₪{repairData.estimatedCost}</div>
+                <div className="text-2xl font-bold">₪{repairData.estimatedCost}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">עלות בפועל</CardTitle>
+                <CardTitle className="text-sm font-medium">עלות בפועל</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">₪{repairData.actualCost}</div>
+                <div className="text-2xl font-bold">₪{repairData.actualCost}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">זמן בתיקון</CardTitle>
+                <CardTitle className="text-sm font-medium">זמן בתיקון</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">3 ימים</div>
+                <div className="text-2xl font-bold">3 ימים</div>
               </CardContent>
             </Card>
-            <Card className="shadow-lg border-none">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">סטטוס אחריות</CardTitle>
+                <CardTitle className="text-sm font-medium">סטטוס אחריות</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-sm font-bold text-foreground">{repairData.issue.warranty}</div>
+                <div className="text-sm font-bold">{repairData.issue.warranty}</div>
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content */}
           <Tabs defaultValue="details" className="space-y-4">
-            <TabsList className="bg-muted">
-              <TabsTrigger
-                value="details"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                פרטי התיקון
-              </TabsTrigger>
-              <TabsTrigger
-                value="timeline"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                ציר זמן
-              </TabsTrigger>
-              <TabsTrigger
-                value="qr-codes"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                QR Codes
-              </TabsTrigger>
-              <TabsTrigger
-                value="notes"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                הערות
-              </TabsTrigger>
+            <TabsList>
+              <TabsTrigger value="details">פרטי התיקון</TabsTrigger>
+              <TabsTrigger value="timeline">ציר זמן</TabsTrigger>
+              <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
+              <TabsTrigger value="notes">הערות</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Customer Info */}
-                <Card className="shadow-lg border-none">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                      <User className="h-6 w-6 text-primary" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
                       פרטי לקוח
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4 text-muted-foreground">
+                  <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm">שם מלא</p>
-                      <p className="font-semibold text-foreground">{repairData.customer.name}</p>
+                      <p className="text-sm text-gray-600">שם מלא</p>
+                      <p className="font-semibold">{repairData.customer.name}</p>
                     </div>
                     <div>
-                      <p className="text-sm">טלפון</p>
+                      <p className="text-sm text-gray-600">טלפון</p>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground">{repairData.customer.phone}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-muted-foreground hover:text-foreground bg-transparent"
-                        >
+                        <p className="font-semibold">{repairData.customer.phone}</p>
+                        <Button variant="outline" size="sm">
                           <Phone className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm">מייל</p>
+                      <p className="text-sm text-gray-600">מייל</p>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground">{repairData.customer.email}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-muted-foreground hover:text-foreground bg-transparent"
-                        >
+                        <p className="font-semibold">{repairData.customer.email}</p>
+                        <Button variant="outline" size="sm">
                           <Mail className="h-4 w-4" />
                         </Button>
                       </div>
@@ -249,55 +221,55 @@ export default function RepairDetails() {
                 </Card>
 
                 {/* Product Info */}
-                <Card className="shadow-lg border-none">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                      <Gem className="h-6 w-6 text-primary" /> {/* Changed icon to Gem */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
                       פרטי תכשיט
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4 text-muted-foreground">
+                  <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm">סוג תכשיט</p>
-                      <p className="font-semibold text-foreground">{repairData.product.type}</p>
+                      <p className="text-sm text-gray-600">סוג תכשיט</p>
+                      <p className="font-semibold">{repairData.product.type}</p>
                     </div>
                     <div>
-                      <p className="text-sm">מותג ודגם</p>
-                      <p className="font-semibold text-foreground">
+                      <p className="text-sm text-gray-600">מותג ודגם</p>
+                      <p className="font-semibold">
                         {repairData.product.brand} {repairData.product.model}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm">חומר</p>
-                      <p className="font-semibold text-foreground">{repairData.product.material}</p>
+                      <p className="text-sm text-gray-600">חומר</p>
+                      <p className="font-semibold">{repairData.product.material}</p>
                     </div>
                     <div>
-                      <p className="text-sm">אבן חן</p>
-                      <p className="font-semibold text-foreground">{repairData.product.gemstone}</p>
+                      <p className="text-sm text-gray-600">אבן חן</p>
+                      <p className="font-semibold">{repairData.product.gemstone}</p>
                     </div>
                     <div>
-                      <p className="text-sm">מספר סידורי / קוד פריט</p>
-                      <p className="font-semibold font-mono text-foreground">{repairData.product.serialNumber}</p>
+                      <p className="text-sm text-gray-600">מספר סידורי / קוד פריט</p>
+                      <p className="font-semibold font-mono">{repairData.product.serialNumber}</p>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Issue Details */}
-                <Card className="lg:col-span-2 shadow-lg border-none">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-2xl font-bold text-foreground">תיאור התקלה</CardTitle>
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>תיאור התקלה</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4 text-muted-foreground">
+                  <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm">תקלה</p>
-                      <p className="font-semibold text-foreground">{repairData.issue.description}</p>
+                      <p className="text-sm text-gray-600">תקלה</p>
+                      <p className="font-semibold">{repairData.issue.description}</p>
                     </div>
                     <div>
-                      <p className="text-sm">פירוט מלא</p>
-                      <p className="text-foreground">{repairData.issue.details}</p>
+                      <p className="text-sm text-gray-600">פירוט מלא</p>
+                      <p className="text-gray-800">{repairData.issue.details}</p>
                     </div>
                     <div>
-                      <p className="text-sm">סטטוס אחריות</p>
+                      <p className="text-sm text-gray-600">סטטוס אחריות</p>
                       <Badge variant="secondary">{repairData.issue.warranty}</Badge>
                     </div>
                   </CardContent>
@@ -306,35 +278,33 @@ export default function RepairDetails() {
             </TabsContent>
 
             <TabsContent value="timeline">
-              <Card className="shadow-lg border-none">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                    <Clock className="h-6 w-6 text-primary" />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
                     ציר זמן של התיקון
                   </CardTitle>
-                  <CardDescription className="text-muted-foreground">מעקב אחר כל השלבים בתהליך התיקון</CardDescription>
+                  <CardDescription>מעקב אחר כל השלבים בתהליך התיקון</CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent>
                   <div className="space-y-6">
                     {repairData.timeline.map((item: any, index: number) => (
                       <div key={index} className="flex items-start gap-4">
                         <div
-                          className={`w-4 h-4 rounded-full mt-1 ${item.completed ? "bg-primary" : "bg-muted"}`}
+                          className={`w-4 h-4 rounded-full mt-1 ${item.completed ? "bg-green-500" : "bg-gray-300"}`}
                         ></div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p
-                              className={`font-medium ${item.completed ? "text-foreground" : "text-muted-foreground"}`}
-                            >
+                            <p className={`font-medium ${item.completed ? "text-gray-900" : "text-gray-500"}`}>
                               {item.step}
                             </p>
                             {item.completed && (
-                              <Badge variant="outline" className="text-xs text-muted-foreground">
+                              <Badge variant="outline" className="text-xs">
                                 {item.user}
                               </Badge>
                             )}
                           </div>
-                          {item.date && <p className="text-sm text-muted-foreground mt-1">{item.date}</p>}
+                          {item.date && <p className="text-sm text-gray-600 mt-1">{item.date}</p>}
                         </div>
                       </div>
                     ))}
@@ -346,24 +316,21 @@ export default function RepairDetails() {
             <TabsContent value="qr-codes">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Product QR */}
-                <Card className="shadow-lg border-none">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                      <QrCode className="h-6 w-6 text-primary" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <QrCode className="h-5 w-5" />
                       QR לתכשיט
                     </CardTitle>
-                    <CardDescription className="text-muted-foreground">QR מודבק על השקית</CardDescription>
+                    <CardDescription>QR מודבק על השקית</CardDescription>
                   </CardHeader>
-                  <CardContent className="text-center space-y-4 pt-4">
+                  <CardContent className="text-center space-y-4">
                     <img
                       src={repairData.qrCodes.product || "/placeholder.svg"}
                       alt="QR Code for Product"
-                      className="mx-auto border-2 border-muted rounded-lg p-2"
+                      className="mx-auto border-2 border-gray-200 rounded-lg"
                     />
-                    <Button
-                      variant="outline"
-                      className="w-full bg-transparent text-primary hover:bg-primary hover:text-primary-foreground"
-                    >
+                    <Button variant="outline" className="w-full bg-transparent">
                       <Printer className="h-4 w-4 mr-2" />
                       הדפס QR
                     </Button>
@@ -371,21 +338,21 @@ export default function RepairDetails() {
                 </Card>
 
                 {/* Customer QR */}
-                <Card className="shadow-lg border-none">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                      <QrCode className="h-6 w-6 text-primary" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <QrCode className="h-5 w-5" />
                       QR ללקוח
                     </CardTitle>
-                    <CardDescription className="text-muted-foreground">QR שנשלח ללקוח</CardDescription>
+                    <CardDescription>QR שנשלח ללקוח</CardDescription>
                   </CardHeader>
-                  <CardContent className="text-center space-y-4 pt-4">
+                  <CardContent className="text-center space-y-4">
                     <img
                       src={repairData.qrCodes.customer || "/placeholder.svg"}
                       alt="QR Code for Customer"
-                      className="mx-auto border-2 border-muted rounded-lg p-2"
+                      className="mx-auto border-2 border-gray-200 rounded-lg"
                     />
-                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Button className="w-full">
                       <Send className="h-4 w-4 mr-2" />
                       שלח SMS מחדש
                     </Button>
@@ -395,20 +362,20 @@ export default function RepairDetails() {
             </TabsContent>
 
             <TabsContent value="notes">
-              <Card className="shadow-lg border-none">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-2xl font-bold text-foreground">הערות והודעות</CardTitle>
-                  <CardDescription className="text-muted-foreground">כל ההערות שנוספו במהלך התיקון</CardDescription>
+              <Card>
+                <CardHeader>
+                  <CardTitle>הערות והודעות</CardTitle>
+                  <CardDescription>כל ההערות שנוספו במהלך התיקון</CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent>
                   <div className="space-y-4">
                     {repairData.notes.map((note: any, index: number) => (
-                      <div key={index} className="border-l-4 border-primary pl-4 py-2">
+                      <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="font-semibold text-foreground text-sm">{note.user}</p>
-                          <p className="text-xs text-muted-foreground">{note.date}</p>
+                          <p className="font-semibold text-sm">{note.user}</p>
+                          <p className="text-xs text-gray-500">{note.date}</p>
                         </div>
-                        <p className="text-foreground">{note.note}</p>
+                        <p className="text-gray-800">{note.note}</p>
                       </div>
                     ))}
                   </div>

@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%; /* Very light off-white */
-    --foreground: 220 10% 15%; /* Dark charcoal */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 220 10% 15%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 10% 15%;
-    --primary: 40 80% 60%; /* Soft Gold/Bronze */
-    --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 210 15% 90%; /* Light Grey-Blue */
-    --secondary-foreground: 220 10% 30%; /* Medium Grey */
-    --muted: 210 20% 95%; /* Lighter muted grey */
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 210 80% 30%; /* Deep Blue */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 20% 90%; /* Lighter Blue/Grey */
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 20% 95%;
-    --accent-foreground: 220 10% 15%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 40 80% 60%; /* Soft Gold/Bronze */
+    --ring: 210 80% 30%; /* Deep Blue */
     --radius: 0.5rem;
   }
 
@@ -33,7 +33,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 40 80% 70%; /* Lighter Gold/Bronze for dark mode */
+    --primary: 210 60% 50%; /* Slightly lighter deep blue for dark mode */
     --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -45,7 +45,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 40 80% 70%; /* Lighter Gold/Bronze for dark mode */
+    --ring: 210 60% 50%; /* Slightly lighter deep blue for dark mode */
   }
 }
 

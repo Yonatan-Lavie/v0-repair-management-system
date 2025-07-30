@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff, Gem } from "lucide-react" // Changed icon to Gem
+import { Loader2, Eye, EyeOff, Shield } from "lucide-react"
 import { authManager } from "@/lib/auth"
 
 interface LoginFormProps {
@@ -50,28 +50,24 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="bg-primary p-3 rounded-full shadow-md">
-              {" "}
-              {/* Changed background to primary */}
-              <Gem className="h-8 w-8 text-primary-foreground" /> {/* Changed icon to Gem */}
+            <div className="bg-blue-600 p-3 rounded-full">
+              <Shield className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-foreground">התחברות מאובטחת</h1>
-          <p className="text-muted-foreground mt-2">מערכת ניהול תיקוני תכשיטים</p> {/* Updated description */}
+          <h1 className="text-3xl font-bold text-gray-900">התחברות מאובטחת</h1>
+          <p className="text-gray-600 mt-2">מערכת ניהול תיקונים</p>
         </div>
 
-        <Card className="shadow-lg border-none">
-          {" "}
-          {/* Added shadow and removed border */}
-          <CardHeader className="pb-4">
-            <CardTitle className="text-center text-2xl font-bold text-foreground">כניסה למערכת</CardTitle>
-            <CardDescription className="text-center text-muted-foreground">הזן את פרטי ההתחברות שלך</CardDescription>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">כניסה למערכת</CardTitle>
+            <CardDescription className="text-center">הזן את פרטי ההתחברות שלך</CardDescription>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -89,7 +85,6 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                   placeholder="your@email.com"
                   required
                   disabled={isLoading}
-                  className="text-foreground"
                 />
               </div>
 
@@ -104,13 +99,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                     placeholder="הכנס סיסמה"
                     required
                     disabled={isLoading}
-                    className="text-foreground"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute left-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                    className="absolute left-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
@@ -119,11 +113,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={isLoading || !formData.email || !formData.password}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading || !formData.email || !formData.password}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -135,11 +125,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               </Button>
             </form>
 
-            <div className="mt-6 p-4 bg-secondary/20 border border-secondary rounded-lg text-secondary-foreground">
-              {" "}
-              {/* Changed background and border to secondary */}
-              <h4 className="font-semibold mb-2">חשבונות לדמו:</h4>
-              <div className="text-sm space-y-1">
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-semibold text-blue-900 mb-2">חשבונות לדמו:</h4>
+              <div className="text-blue-800 text-sm space-y-1">
                 <p>
                   <strong>מנהל:</strong> admin@system.com / admin123
                 </p>

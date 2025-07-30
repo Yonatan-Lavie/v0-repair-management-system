@@ -56,15 +56,15 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
       {/* Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="חפש לפי מזהה תיקון, לקוח או תכשיט..." {/* Updated placeholder */}\
+            placeholder="חפש לפי מזהה תיקון, לקוח או מוצר..."
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10 text-foreground"
+            className="pl-10"
           />
         </div>
-        <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="bg-transparent text-muted-foreground hover:text-foreground">
+        <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="bg-transparent">
           <Filter className="h-4 w-4 mr-2" />
           סינון
         </Button>
@@ -72,22 +72,22 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
 
       {/* Active Filters */}
       {Object.keys(activeFilters).length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap text-muted-foreground">
-          <span className="text-sm">פילטרים פעילים:</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-gray-600">פילטרים פעילים:</span>
           {Object.entries(activeFilters).map(([key, value]) => (
-            <Badge key={key} variant="secondary" className="flex items-center gap-1 text-secondary-foreground">
+            <Badge key={key} variant="secondary" className="flex items-center gap-1">
               {key}: {value}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => clearFilter(key)}
-                className="h-4 w-4 p-0 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                className="h-4 w-4 p-0 hover:bg-transparent"
               >
                 <X className="h-3 w-3" />
               </Button>
             </Badge>
           ))}
-          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs">
             נקה הכל
           </Button>
         </div>
@@ -95,15 +95,15 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
 
       {/* Filter Options */}
       {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted rounded-lg"> {/* Changed background to muted */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
           {filterOptions.status && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground">סטטוס</label>
+              <label className="text-sm font-medium mb-2 block">סטטוס</label>
               <Select
                 value={activeFilters.status || "all"}
                 onValueChange={(value) => handleFilterChange("status", value)}
               >
-                <SelectTrigger className="text-muted-foreground">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,12 +120,12 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
 
           {filterOptions.priority && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground">עדיפות</label>
+              <label className="text-sm font-medium mb-2 block">עדיפות</label>
               <Select
                 value={activeFilters.priority || "all"}
                 onValueChange={(value) => handleFilterChange("priority", value)}
               >
-                <SelectTrigger className="text-muted-foreground">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -142,16 +142,16 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
 
           {filterOptions.technician && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground">צורף/טכנאי</label> {/* Updated label */}
+              <label className="text-sm font-medium mb-2 block">טכנאי</label>
               <Select
                 value={activeFilters.technician || "all"}
                 onValueChange={(value) => handleFilterChange("technician", value)}
               >
-                <SelectTrigger className="text-muted-foreground">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">כל הצורפים/טכנאים</SelectItem> {/* Updated label */}
+                  <SelectItem value="all">כל הטכנאים</SelectItem>
                   {filterOptions.technician.map((tech) => (
                     <SelectItem key={tech} value={tech}>
                       {tech}
@@ -164,12 +164,12 @@ export function SearchFilters({ onSearch, onFilter, filterOptions }: SearchFilte
 
           {filterOptions.dateRange && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground">תקופה</label>
+              <label className="text-sm font-medium mb-2 block">תקופה</label>
               <Select
                 value={activeFilters.dateRange || "all"}
                 onValueChange={(value) => handleFilterChange("dateRange", value)}
               >
-                <SelectTrigger className="text-muted-foreground">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

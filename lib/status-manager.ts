@@ -1,8 +1,5 @@
 // Status management system for repairs
 
-import { demoData, getDemoData } from "./demo-data"
-import { auditLogger } from "./audit-logger"
-
 export interface StatusUpdate {
   repairId: string
   newStatus: string
@@ -23,70 +20,24 @@ export class RepairStatusManager {
   }
 
   // Update repair status
-  updateStatus(repairId: string, newStatus: string, updatedBy: string): boolean {
+  updateStatus(repairId: string, newStatus: string, updatedBy: string, notes?: string): boolean {
     try {
-      const repairIndex = demoData.repairs.findIndex((r) => r.repairId === repairId)
-
-      if (repairIndex === -1) {
-        console.error(`Repair with ID ${repairId} not found.`)
-        auditLogger.log(updatedBy, updatedBy, "Repair Status Update Failed", {
-          repairId,
-          newStatus,
-          reason: "Repair not found",
-        })
-        return false
-      }
-
-      const oldStatus = demoData.repairs[repairIndex].status
-      demoData.repairs[repairIndex].status = newStatus
-
-      // Update timeline
-      const timeline = demoData.repairTimelines[repairId] || []
-      const now = new Date().toLocaleString("he-IL")
-
-      let newStep = ""
-      switch (newStatus) {
-        case "התקבל":
-          newStep = "התקבל בסדנה"
-          break
-        case "בתהליך תיקון":
-          newStep = "בתהליך תיקון"
-          break
-        case "תוקן - מוכן לשילוח":
-          newStep = "הושלם - ממתין לשילוח"
-          break
-        case "ממתין לאיסוף": // This status is typically set by technician/shop-manager after repair is done and sent back to shop
-          newStep = "מוכן לאיסוף בחנות"
-          break
-        case "הושלם": // This status means picked up by customer
-          newStep = "נאסף על ידי לקוח"
-          break
-        default:
-          newStep = `סטטוס עודכן ל: ${newStatus}`
-      }
-
-      // Find the corresponding step in the timeline and mark it complete, or add a new one
-      const existingStepIndex = timeline.findIndex((t) => t.step.includes(newStep.split("(")[0].trim())) // Match by main part of step
-      if (existingStepIndex !== -1) {
-        timeline[existingStepIndex].completed = true
-        timeline[existingStepIndex].date = now
-        timeline[existingStepIndex].user = updatedBy
-      } else {
-        // Add new step if it doesn't exist or is a custom update
-        timeline.push({ step: newStep, date: now, completed: true, user: updatedBy })
-      }
-      // Sort timeline by date if necessary (simple sort for demo)
-      timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-      demoData.repairTimelines[repairId] = timeline // Ensure it's saved back to mock data
-
-      auditLogger.log(updatedBy, updatedBy, "Repair Status Updated", {
+      const update: StatusUpdate = {
         repairId,
-        oldStatus,
         newStatus,
-      })
+        updatedBy,
+        timestamp: new Date().toISOString(),
+        notes,
+      }
 
-      console.log(`Repair ${repairId} status updated from ${oldStatus} to ${newStatus} by ${updatedBy}.`)
+      this.statusHistory.push(update)
+
+      // In a real app, this would update the database
+      console.log(`Status updated: ${repairId} -> ${newStatus} by ${updatedBy}`)
+
+      // Send notifications
+      this.sendStatusNotification(repairId, newStatus, updatedBy)
+
       return true
     } catch (error) {
       console.error("Failed to update status:", error)
@@ -174,39 +125,6 @@ export class RepairStatusManager {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
     return diffDays
-  }
-
-  /**
-   * Adds a note to a repair.
-   * @param repairId The ID of the repair.
-   * @param noteContent The content of the note.
-   * @param user The user adding the note.
-   * @returns True if successful, false otherwise.
-   */
-  addNote(repairId: string, noteContent: string, user: string): boolean {
-    const repair = getDemoData.getRepair(repairId)
-    if (!repair) {
-      console.error(`Repair with ID ${repairId} not found for adding note.`)
-      auditLogger.log(user, user, "Add Note Failed", { repairId, noteContent, reason: "Repair not found" })
-      return false
-    }
-
-    const newNote = {
-      id: `NOTE${Date.now()}`,
-      repairId,
-      note: noteContent,
-      user,
-      date: new Date().toLocaleString("he-IL"),
-    }
-
-    if (!demoData.repairNotes[repairId]) {
-      demoData.repairNotes[repairId] = []
-    }
-    demoData.repairNotes[repairId].push(newNote)
-
-    auditLogger.log(user, user, "Repair Note Added", { repairId, noteId: newNote.id, noteContent })
-    console.log(`Note added to repair ${repairId} by ${user}.`)
-    return true
   }
 }
 

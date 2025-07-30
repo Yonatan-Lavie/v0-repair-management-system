@@ -1,215 +1,315 @@
-import { sign, verify } from "jsonwebtoken"
-import { inputValidation } from "./input-validation"
-import { auditLogger } from "./audit-logger"
-import { demoData } from "./demo-data"
+// Authentication and authorization system
 
-// Define session interface
-export interface UserSession {
-  token: string
-  user: {
-    id: string
-    name: string
-    email: string
-    role: string
-    shopId?: string
-    permissions: string[]
-  }
-  expiresAt: string
+import { jwtVerify, SignJWT } from "jose"
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  role: "admin" | "shop-manager" | "seller" | "technician"
+  shopId?: string
+  permissions: string[]
+  lastLogin?: string
+  isActive: boolean
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretjwtkeyforjewelryrepairsystem"
-const TOKEN_EXPIRATION_HOURS = 24 // Token valid for 24 hours
+export interface AuthSession {
+  user: User
+  token: string
+  expiresAt: Date
+}
 
-export const authManager = {
-  /**
-   * Simulates user login.
-   * @param email User's email.
-   * @param password User's password.
-   * @returns A success object with session data or an error object.
-   */
-  login: async (
-    email: string,
-    password: string,
-  ): Promise<{ success: boolean; session?: UserSession; error?: string }> => {
-    // Basic input validation
-    if (!inputValidation.isValidEmail(email)) {
-      return { success: false, error: "פורמט מייל לא תקין." }
+// Role-based permissions
+const ROLE_PERMISSIONS = {
+  admin: [
+    "system:read",
+    "system:write",
+    "users:read",
+    "users:write",
+    "users:delete",
+    "shops:read",
+    "shops:write",
+    "shops:delete",
+    "repairs:read",
+    "repairs:write",
+    "reports:read",
+    "settings:read",
+    "settings:write",
+  ],
+  "shop-manager": [
+    "shop:read",
+    "shop:write",
+    "staff:read",
+    "staff:write",
+    "repairs:read",
+    "repairs:write",
+    "reports:read",
+    "customers:read",
+  ],
+  seller: [
+    "repairs:create",
+    "repairs:read",
+    "repairs:update",
+    "qr:scan",
+    "qr:generate",
+    "customers:read",
+    "customers:write",
+  ],
+  technician: ["repairs:read", "repairs:update", "qr:scan", "status:update"],
+}
+
+class AuthManager {
+  private static instance: AuthManager
+  private currentSession: AuthSession | null = null
+  private readonly JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key")
+
+  static getInstance(): AuthManager {
+    if (!AuthManager.instance) {
+      AuthManager.instance = new AuthManager()
     }
-    // In a real app, password would be hashed and compared securely
-    if (password.length < 6) {
-      // Simple check for demo
-      return { success: false, error: "סיסמה קצרה מדי." }
-    }
+    return AuthManager.instance
+  }
 
-    // Simulate user lookup
-    const user = demoData.users.find((u) => u.email === email)
-
-    if (!user) {
-      auditLogger.log("N/A", email, "Login Attempt Failed", { reason: "User not found" })
-      return { success: false, error: "משתמש או סיסמה שגויים." }
-    }
-
-    // Simulate password check (replace with actual hash comparison)
-    const isPasswordCorrect =
-      (user.email === "admin@system.com" && password === "admin123") ||
-      (user.email === "dana@fixit.com" && password === "manager123") ||
-      (user.email === "seller@fixit.com" && password === "seller123") ||
-      (user.email === "tech@fixit.com" && password === "tech123")
-
-    if (!isPasswordCorrect) {
-      auditLogger.log(user.id, user.name, "Login Attempt Failed", { reason: "Incorrect password" })
-      return { success: false, error: "משתמש או סיסמה שגויים." }
-    }
-
-    if (user.status === "לא פעיל") {
-      auditLogger.log(user.id, user.name, "Login Attempt Failed", { reason: "Account inactive" })
-      return { success: false, error: "החשבון אינו פעיל. אנא פנה למנהל המערכת." }
-    }
-
-    // Generate JWT token
-    const payload = {
-      userId: user.id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      shopId: user.shopId,
-      permissions: user.permissions,
-    }
-    const token = sign(payload, JWT_SECRET, { expiresIn: `${TOKEN_EXPIRATION_HOURS}h` })
-
-    const expiresAt = new Date(Date.now() + TOKEN_EXPIRATION_HOURS * 60 * 60 * 1000).toISOString()
-
-    const session: UserSession = {
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        shopId: user.shopId,
-        permissions: user.permissions,
-      },
-      expiresAt,
-    }
-
-    // Store token in localStorage (client-side simulation)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("jwt_token", token)
-      localStorage.setItem("username", user.name) // Store username for display
-      localStorage.setItem("user_role", user.role) // Store role for display
-      localStorage.setItem("user_shop_id", user.shopId || "") // Store shopId
-    }
-
-    auditLogger.log(user.id, user.name, "User Login Success", { email: user.email, role: user.role })
-    return { success: true, session }
-  },
-
-  /**
-   * Simulates user logout.
-   */
-  logout: async (): Promise<void> => {
-    if (typeof window !== "undefined") {
-      const currentUser = authManager.getCurrentSession()?.user
-      if (currentUser) {
-        auditLogger.log(currentUser.id, currentUser.name, "User Logout", {})
-      }
-      localStorage.removeItem("jwt_token")
-      localStorage.removeItem("username")
-      localStorage.removeItem("user_role")
-      localStorage.removeItem("user_shop_id")
-    }
-  },
-
-  /**
-   * Verifies the JWT token and returns the user session.
-   * @param token The JWT token to verify.
-   * @returns The user session if valid, otherwise null.
-   */
-  verifyToken: (token: string): UserSession | null => {
+  // Login with email and password
+  async login(email: string, password: string): Promise<{ success: boolean; session?: AuthSession; error?: string }> {
     try {
-      const decoded = verify(token, JWT_SECRET) as {
-        userId: string
-        userName: string
-        userEmail: string
-        userRole: string
-        shopId?: string
-        permissions: string[]
-        exp: number
+      // In a real app, this would validate against database
+      const user = await this.validateCredentials(email, password)
+
+      if (!user) {
+        this.logSecurityEvent("login_failed", { email, reason: "invalid_credentials" })
+        return { success: false, error: "שם משתמש או סיסמה שגויים" }
       }
 
-      const expiresAt = new Date(decoded.exp * 1000).toISOString()
+      if (!user.isActive) {
+        this.logSecurityEvent("login_failed", { email, reason: "account_disabled" })
+        return { success: false, error: "החשבון מושבת" }
+      }
 
-      return {
-        token,
+      // Generate JWT token
+      const token = await this.generateToken(user)
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+      const session: AuthSession = {
         user: {
-          id: decoded.userId,
-          name: decoded.userName,
-          email: decoded.userEmail,
-          role: decoded.userRole,
-          shopId: decoded.shopId,
-          permissions: decoded.permissions,
+          ...user,
+          permissions: ROLE_PERMISSIONS[user.role] || [],
+          lastLogin: new Date().toISOString(),
         },
+        token,
         expiresAt,
       }
+
+      this.currentSession = session
+      this.storeSession(session)
+      this.logSecurityEvent("login_success", { userId: user.id, email })
+
+      return { success: true, session }
+    } catch (error) {
+      console.error("Login error:", error)
+      return { success: false, error: "שגיאה בהתחברות" }
+    }
+  }
+
+  // Logout
+  async logout(): Promise<void> {
+    if (this.currentSession) {
+      this.logSecurityEvent("logout", { userId: this.currentSession.user.id })
+      this.clearSession()
+    }
+  }
+
+  // Validate credentials (mock implementation)
+  private async validateCredentials(email: string, password: string): Promise<User | null> {
+    // Mock users for demo - in real app, query database with hashed passwords
+    const mockUsers: Record<string, User> = {
+      "admin@system.com": {
+        id: "1",
+        email: "admin@system.com",
+        name: "מנהל מערכת",
+        role: "admin",
+        permissions: [],
+        isActive: true,
+      },
+      "dana@fixit.com": {
+        id: "2",
+        email: "dana@fixit.com",
+        name: "דנה ברק",
+        role: "shop-manager",
+        shopId: "SHOP001",
+        permissions: [],
+        isActive: true,
+      },
+      "seller@fixit.com": {
+        id: "3",
+        email: "seller@fixit.com",
+        name: "מוכר חנות",
+        role: "seller",
+        shopId: "SHOP001",
+        permissions: [],
+        isActive: true,
+      },
+      "tech@fixit.com": {
+        id: "4",
+        email: "tech@fixit.com",
+        name: "יוסי בן-חיים",
+        role: "technician",
+        shopId: "SHOP001",
+        permissions: [],
+        isActive: true,
+      },
+    }
+
+    // Simple password check for demo (in real app, use bcrypt)
+    const validPasswords: Record<string, string> = {
+      "admin@system.com": "admin123",
+      "dana@fixit.com": "manager123",
+      "seller@fixit.com": "seller123",
+      "tech@fixit.com": "tech123",
+    }
+
+    if (validPasswords[email] === password) {
+      return mockUsers[email] || null
+    }
+
+    return null
+  }
+
+  // Generate JWT token
+  private async generateToken(user: User): Promise<string> {
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      shopId: user.shopId,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
+    }
+
+    return await new SignJWT(payload).setProtectedHeader({ alg: "HS256" }).sign(this.JWT_SECRET)
+  }
+
+  // Verify JWT token
+  async verifyToken(token: string): Promise<User | null> {
+    try {
+      const { payload } = await jwtVerify(token, this.JWT_SECRET)
+
+      // Get user from payload
+      const user: User = {
+        id: payload.userId as string,
+        email: payload.email as string,
+        name: "", // Would be fetched from DB
+        role: payload.role as User["role"],
+        shopId: payload.shopId as string,
+        permissions: ROLE_PERMISSIONS[payload.role as User["role"]] || [],
+        isActive: true,
+      }
+
+      return user
     } catch (error) {
       console.error("Token verification failed:", error)
       return null
     }
-  },
+  }
 
-  /**
-   * Gets the current user session from localStorage.
-   * @returns The current user session or null if not logged in.
-   */
-  getCurrentSession: (): UserSession | null => {
-    if (typeof window === "undefined") {
-      return null // Not available on server side directly from localStorage
+  // Check if user has permission
+  hasPermission(permission: string): boolean {
+    if (!this.currentSession) return false
+    return this.currentSession.user.permissions.includes(permission)
+  }
+
+  // Check if user has role
+  hasRole(role: string): boolean {
+    if (!this.currentSession) return false
+    return this.currentSession.user.role === role
+  }
+
+  // Check if user can access shop
+  canAccessShop(shopId: string): boolean {
+    if (!this.currentSession) return false
+
+    const user = this.currentSession.user
+
+    // Admin can access all shops
+    if (user.role === "admin") return true
+
+    // Others can only access their assigned shop
+    return user.shopId === shopId
+  }
+
+  // Get current session
+  getCurrentSession(): AuthSession | null {
+    return this.currentSession
+  }
+
+  // Store session in localStorage
+  private storeSession(session: AuthSession): void {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "auth_session",
+        JSON.stringify({
+          user: session.user,
+          token: session.token,
+          expiresAt: session.expiresAt.toISOString(),
+        }),
+      )
     }
-    const token = localStorage.getItem("jwt_token")
-    if (!token) {
+  }
+
+  // Load session from localStorage
+  loadSession(): AuthSession | null {
+    if (typeof window === "undefined") return null
+
+    try {
+      const stored = localStorage.getItem("auth_session")
+      if (!stored) return null
+
+      const parsed = JSON.parse(stored)
+      const expiresAt = new Date(parsed.expiresAt)
+
+      // Check if session expired
+      if (expiresAt < new Date()) {
+        this.clearSession()
+        return null
+      }
+
+      const session: AuthSession = {
+        user: parsed.user,
+        token: parsed.token,
+        expiresAt,
+      }
+
+      this.currentSession = session
+      return session
+    } catch (error) {
+      console.error("Failed to load session:", error)
+      this.clearSession()
       return null
     }
-    return authManager.verifyToken(token)
-  },
+  }
 
-  /**
-   * Checks if the current user has a specific permission.
-   * @param permission The permission string to check (e.g., "users:read").
-   * @returns True if the user has the permission, false otherwise.
-   */
-  hasPermission: (permission: string): boolean => {
-    const session = authManager.getCurrentSession()
-    if (!session) return false
+  // Clear session
+  private clearSession(): void {
+    this.currentSession = null
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_session")
+    }
+  }
 
-    // Admin role has all permissions
-    if (session.user.role === "admin") return true
+  // Log security events
+  private logSecurityEvent(event: string, data: any): void {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      event,
+      data,
+      ip: "unknown", // In real app, get from request
+      userAgent: typeof window !== "undefined" ? window.navigator.userAgent : "unknown",
+    }
 
-    return session.user.permissions.includes(permission)
-  },
+    console.log("Security Event:", logEntry)
 
-  /**
-   * Checks if the current user has one of the required roles.
-   * @param requiredRoles An array of roles.
-   * @returns True if the user has at least one of the required roles, false otherwise.
-   */
-  hasRole: (requiredRoles: string[]): boolean => {
-    const session = authManager.getCurrentSession()
-    if (!session) return false
-    return requiredRoles.includes(session.user.role)
-  },
-
-  /**
-   * Checks if the current user's shopId matches the required shopId.
-   * @param requiredShopId The shopId to match.
-   * @returns True if the shopId matches or if the user is an admin, false otherwise.
-   */
-  isShopSpecificUser: (requiredShopId: string): boolean => {
-    const session = authManager.getCurrentSession()
-    if (!session) return false
-
-    // Admins can access any shop's data
-    if (session.user.role === "admin") return true
-
-    return session.user.shopId === requiredShopId
-  },
+    // In real app, store in database or send to security monitoring service
+  }
 }
+
+export const authManager = AuthManager.getInstance()

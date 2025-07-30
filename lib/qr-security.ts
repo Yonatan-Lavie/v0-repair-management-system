@@ -1,77 +1,172 @@
-import { sign, verify } from "jsonwebtoken"
+// QR Code security and validation
 
-// Define the structure for QR code data
-interface QRData {
+import { createHmac } from "crypto"
+
+export interface QRData {
   repairId: string
   type: "product" | "customer"
+  timestamp: number
+  expiresAt: number
+  signature: string
   shopId?: string
-  // Product specific fields
-  productType?: string
-  productBrand?: string
-  productModel?: string
-  serialNumber?: string // Changed from imei
-  // Customer specific fields
   customerId?: string
-  customerName?: string
-  // Security fields
-  iat?: number // Issued at
-  exp?: number // Expiration time
+  productType?: string // Added for jewelry
+  productBrand?: string // Added for jewelry
+  productModel?: string // Added for jewelry
+  serialNumber?: string // Changed from productId for jewelry
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretjwtkeyforjewelryrepairsystem"
-const QR_SECRET = process.env.QR_SECRET || "supersecretqrkeyforjewelryrepairsystem"
-const BASE_QR_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://example.com/qr" // Base URL for QR code generation
+class QRSecurityManager {
+  private static instance: QRSecurityManager
+  private readonly SECRET_KEY = process.env.QR_SECRET || "qr-secret-key"
+  private readonly EXPIRY_HOURS = 24 * 30 // 30 days
 
-export const qrSecurity = {
-  /**
-   * Generates a secure QR code URL containing signed data.
-   * @param data The data to embed in the QR code.
-   * @returns A URL string that can be used to generate a QR code image.
-   */
-  generateSecureQRURL: (data: Partial<QRData>): string => {
-    const payload: QRData = {
-      ...data,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365, // Valid for 1 year
+  static getInstance(): QRSecurityManager {
+    if (!QRSecurityManager.instance) {
+      QRSecurityManager.instance = new QRSecurityManager()
     }
-    const token = sign(payload, QR_SECRET, { algorithm: "HS256" })
-    // Use a QR code API that accepts data as a URL parameter
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${BASE_QR_URL}?token=${token}`)}`
-  },
+    return QRSecurityManager.instance
+  }
 
-  /**
-   * Verifies and parses the data from a QR code URL.
-   * @param qrUrl The full QR code URL (e.g., from a scan).
-   * @returns The parsed QRData if valid, otherwise null.
-   */
-  verifyAndParseQR: (qrUrl: string): QRData | null => {
+  // Generate secure QR data
+  generateQRData(params: {
+    repairId: string
+    type: "product" | "customer"
+    shopId?: string
+    customerId?: string
+    productType?: string
+    productBrand?: string
+    productModel?: string
+    serialNumber?: string
+  }): QRData {
+    const timestamp = Date.now()
+    const expiresAt = timestamp + this.EXPIRY_HOURS * 60 * 60 * 1000
+
+    const dataToSign = {
+      repairId: params.repairId,
+      type: params.type,
+      timestamp,
+      expiresAt,
+      shopId: params.shopId,
+      customerId: params.customerId,
+      productType: params.productType,
+      productBrand: params.productBrand,
+      productModel: params.productModel,
+      serialNumber: params.serialNumber,
+    }
+
+    const signature = this.generateSignature(dataToSign)
+
+    return {
+      ...dataToSign,
+      signature,
+    }
+  }
+
+  // Validate QR data
+  validateQRData(qrData: QRData): { valid: boolean; error?: string } {
     try {
-      const url = new URL(qrUrl)
-      const token = url.searchParams.get("token")
-
-      if (!token) {
-        throw new Error("QR token not found in URL.")
+      // Check expiration
+      if (Date.now() > qrData.expiresAt) {
+        return { valid: false, error: "QR Code פג תוקף" }
       }
 
-      const decoded = verify(token, QR_SECRET, { algorithms: ["HS256"] }) as QRData
-      return decoded
+      // Verify signature
+      const expectedSignature = this.generateSignature({
+        repairId: qrData.repairId,
+        type: qrData.type,
+        timestamp: qrData.timestamp,
+        expiresAt: qrData.expiresAt,
+        shopId: qrData.shopId,
+        customerId: qrData.customerId,
+        productType: qrData.productType,
+        productBrand: qrData.productBrand,
+        productModel: qrData.productModel,
+        serialNumber: qrData.serialNumber,
+      })
+
+      if (expectedSignature !== qrData.signature) {
+        return { valid: false, error: "QR Code לא תקין" }
+      }
+
+      return { valid: true }
     } catch (error) {
-      console.error("QR verification failed:", error)
+      return { valid: false, error: "שגיאה בבדיקת QR Code" }
+    }
+  }
+
+  // Generate signature for QR data
+  private generateSignature(data: any): string {
+    const dataString = JSON.stringify(data, Object.keys(data).sort())
+    return createHmac("sha256", this.SECRET_KEY).update(dataString).digest("hex")
+  }
+
+  // Encode QR data to string
+  encodeQRData(qrData: QRData): string {
+    const encoded = Buffer.from(JSON.stringify(qrData)).toString("base64")
+    return encoded
+  }
+
+  // Decode QR data from string
+  decodeQRData(encoded: string): QRData | null {
+    try {
+      const decoded = Buffer.from(encoded, "base64").toString("utf-8")
+      return JSON.parse(decoded) as QRData
+    } catch (error) {
+      console.error("Failed to decode QR data:", error)
       return null
     }
-  },
+  }
 
-  /**
-   * Generates raw QR data (for internal use or direct embedding if not using URL).
-   * @param data The data to generate.
-   * @returns The signed JWT token.
-   */
-  generateQRData: (data: Partial<QRData>): string => {
-    const payload: QRData = {
-      ...data,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365, // Valid for 1 year
+  // Generate QR URL with security
+  generateSecureQRURL(params: {
+    repairId: string
+    type: "product" | "customer"
+    shopId?: string
+    customerId?: string
+    productType?: string
+    productBrand?: string
+    productModel?: string
+    serialNumber?: string
+  }): string {
+    const qrData = this.generateQRData(params)
+    const encoded = this.encodeQRData(qrData)
+
+    // In a real app, this would be your domain
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://repair-system.com"
+
+    if (params.type === "customer") {
+      return `${baseUrl}/customer/track?data=${encoded}`
+    } else {
+      return `${baseUrl}/scan/product?data=${encoded}`
     }
-    return sign(payload, QR_SECRET, { algorithm: "HS256" })
-  },
+  }
+
+  // Validate scanned QR URL
+  validateScannedQR(url: string): { valid: boolean; data?: QRData; error?: string } {
+    try {
+      const urlObj = new URL(url)
+      const encodedData = urlObj.searchParams.get("data")
+
+      if (!encodedData) {
+        return { valid: false, error: "QR Code לא תקין" }
+      }
+
+      const qrData = this.decodeQRData(encodedData)
+      if (!qrData) {
+        return { valid: false, error: "לא ניתן לפענח QR Code" }
+      }
+
+      const validation = this.validateQRData(qrData)
+      if (!validation.valid) {
+        return validation
+      }
+
+      return { valid: true, data: qrData }
+    } catch (error) {
+      return { valid: false, error: "QR Code לא תקין" }
+    }
+  }
 }
+
+export const qrSecurity = QRSecurityManager.getInstance()
