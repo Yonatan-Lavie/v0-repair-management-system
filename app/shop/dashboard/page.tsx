@@ -1,153 +1,260 @@
-import ProtectedRoute from "@/components/auth/protected-route"
-import PermissionGuard from "@/components/auth/permission-guard"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, CheckCircle, XCircle, Users, Package } from "lucide-react"
-import { demoData } from "@/lib/demo-data"
-import { statusManager } from "@/lib/status-manager"
-import { getCurrentSession } from "@/app/actions/auth" // Import auth actions
-import { redirect } from "next/navigation"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Store, Wrench, Clock, CheckCircle, BarChart3 } from "lucide-react" // Added Gem icon
+import { ProtectedRoute } from "@/components/auth/protected-route"
+import { authManager } from "@/lib/auth"
 
-export default async function ShopDashboardPage() {
-  const session = await getCurrentSession()
-  if (!session || !session.user.shopId) {
-    redirect("/login") // Redirect if no session or no shopId for shop manager
-  }
+// Import the demo data at the top
+import { demoData, getDemoData } from "@/lib/demo-data"
 
-  const userShopId = session.user.shopId
-  const shop = demoData.shops.find((s) => s.id === userShopId)
-
-  if (!shop) {
-    redirect("/unauthorized") // Or handle error if shop not found for user's shopId
-  }
-
-  const shopRepairs = demoData.repairs.filter((r) => r.shopId === userShopId)
-  const shopUsers = demoData.users.filter((u) => u.shopId === userShopId)
-
-  const totalRepairs = shopRepairs.length
-  const pendingRepairs = shopRepairs.filter((r) => r.status === "בבדיקה" || r.status === "בתיקון").length
-  const completedRepairs = shopRepairs.filter((r) => r.status === "הושלם" || r.status === "נמסר").length
-  const cancelledRepairs = shopRepairs.filter((r) => r.status === "בוטל").length
-
-  const recentRepairs = shopRepairs
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+// Replace the mockShopData with:
+const mockShopData = {
+  shop: demoData.shops[0], // FixIt Electronics
+  stats: demoData.shops[0].stats,
+  recentRepairs: demoData.repairs
+    .filter((repair) => repair.shopId === "SHOP001")
     .slice(0, 5)
+    .map((repair) => ({
+      repairId: repair.repairId,
+      customerName: getDemoData.getCustomer(repair.customerId)?.name || "לא ידוע",
+      product:
+        `${getDemoData.getProduct(repair.productId)?.brand || ""} ${getDemoData.getProduct(repair.productId)?.model || ""} ${getDemoData.getProduct(repair.productId)?.type || ""}`.trim(),
+      issue: repair.issue,
+      status: repair.status,
+      createdAt: new Date(repair.createdAt).toLocaleDateString("he-IL"),
+      technician: repair.assignedTechnician,
+    })),
+  staff: demoData.users
+    .filter((user) => user.shopId === "SHOP001")
+    .map((user) => ({
+      name: user.name,
+      role: user.role === "seller" ? "מוכר" : user.role === "technician" ? "צורף/טכנאי" : "מנהל חנות",
+      activeRepairs: getDemoData
+        .getRepairsByTechnician(user.name)
+        .filter((r) => ["נשלח לתיקון", "התקבל", "בתהליך תיקון"].includes(r.status)).length,
+    })),
+}
+
+export default function ShopDashboard() {
+  const [username, setUsername] = useState("")
+
+  useEffect(() => {
+    setUsername(authManager.getCurrentSession()?.user.name || "מנהל חנות")
+  }, [])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ממתין לאיסוף":
+        return "default"
+      case "בתהליך תיקון":
+        return "secondary"
+      case "הושלם":
+        return "outline"
+      default:
+        return "default"
+    }
+  }
+
+  const handleLogout = async () => {
+    await authManager.logout()
+    window.location.href = "/login"
+  }
 
   return (
-    <ProtectedRoute allowedRoles={["shop-manager"]}>
-      <PermissionGuard permission="shop:read">
-        <div className="container mx-auto py-8 px-4">
-          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">לוח מחוונים - {shop.name}</h1>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-md border-none bg-gradient-to-br from-primary/10 to-primary/5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-primary">תיקונים בסך הכל</CardTitle>
-                <Package className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{totalRepairs}</div>
-                <p className="text-xs text-muted-foreground">סה"כ תיקונים בחנות</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-yellow-100/10 to-yellow-100/5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-yellow-700">תיקונים ממתינים</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-700" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{pendingRepairs}</div>
-                <p className="text-xs text-muted-foreground">בבדיקה או בתיקון</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-green-100/10 to-green-100/5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-green-700">תיקונים שהושלמו</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-700" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{completedRepairs}</div>
-                <p className="text-xs text-muted-foreground">הושלמו או נמסרו</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-red-100/10 to-red-100/5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-red-700">תיקונים שבוטלו</CardTitle>
-                <XCircle className="h-4 w-4 text-red-700" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{cancelledRepairs}</div>
-                <p className="text-xs text-muted-foreground">תיקונים שבוטלו</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-lg border-none">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
-                  <Clock className="w-5 h-5" /> תיקונים אחרונים
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>מספר תיקון</TableHead>
-                      <TableHead>לקוח</TableHead>
-                      <TableHead>תכשיט</TableHead>
-                      <TableHead>סטטוס</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentRepairs.map((repair) => (
-                      <TableRow key={repair.id}>
-                        <TableCell className="font-medium text-foreground">{repair.id}</TableCell>
-                        <TableCell className="text-muted-foreground">{repair.customerName}</TableCell>
-                        <TableCell className="text-muted-foreground">{repair.itemType}</TableCell>
-                        <TableCell>
-                          <Badge className={statusManager.getStatusColorClass(repair.status)}>
-                            {statusManager.getDisplayStatus(repair.status)}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-none">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
-                  <Users className="w-5 h-5" /> צוות החנות
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>שם</TableHead>
-                      <TableHead>תפקיד</TableHead>
-                      <TableHead>מייל</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shopUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium text-foreground">{user.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{user.role}</TableCell>
-                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+    <ProtectedRoute requiredRole="shop-manager" shopId={mockShopData.shop.shopId}>
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="bg-card shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center gap-3">
+                <Store className="h-8 w-8 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">{mockShopData.shop.shopName}</h1>
+                  <p className="text-muted-foreground">שלום, {username}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="text-muted-foreground hover:text-foreground bg-transparent"
+                >
+                  יציאה
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </PermissionGuard>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <Card className="shadow-lg border-none">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">תיקונים פעילים</CardTitle>
+                <Wrench className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{mockShopData.stats.activeRepairs}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-none">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">הושלמו היום</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{mockShopData.stats.completedToday}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-none">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">זמן ממוצע</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{mockShopData.stats.avgRepairTime}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-none">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">שביעות רצון</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{mockShopData.stats.customerSatisfaction}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <Tabs defaultValue="repairs" className="space-y-4">
+            <TabsList className="bg-muted">
+              <TabsTrigger
+                value="repairs"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                תיקונים אחרונים
+              </TabsTrigger>
+              <TabsTrigger
+                value="staff"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                צוות
+              </TabsTrigger>
+              <TabsTrigger
+                value="reports"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                דוחות
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="repairs">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">תיקונים אחרונים</CardTitle>
+                  <CardDescription className="text-muted-foreground">מעקב אחר כל התיקונים בחנות</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>מזהה תיקון</TableHead>
+                        <TableHead>לקוח</TableHead>
+                        <TableHead>תכשיט</TableHead>
+                        <TableHead>תקלה</TableHead>
+                        <TableHead>סטטוס</TableHead>
+                        <TableHead>צורף/טכנאי</TableHead>
+                        <TableHead>תאריך</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockShopData.recentRepairs.map((repair) => (
+                        <TableRow key={repair.repairId}>
+                          <TableCell className="font-medium text-foreground">{repair.repairId}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.customerName}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.product}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.issue}</TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusColor(repair.status)}>{repair.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{repair.technician}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.createdAt}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="staff">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">צוות החנות</CardTitle>
+                  <CardDescription className="text-muted-foreground">מידע על עובדי החנות ועומס העבודה</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>שם</TableHead>
+                        <TableHead>תפקיד</TableHead>
+                        <TableHead>תיקונים פעילים</TableHead>
+                        <TableHead>פעולות</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockShopData.staff.map((member, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium text-foreground">{member.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{member.role}</TableCell>
+                          <TableCell className="text-muted-foreground">{member.activeRepairs}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-muted-foreground hover:text-foreground bg-transparent"
+                            >
+                              צפה בפרטים
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="reports">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">דוחות ואנליטיקה</CardTitle>
+                  <CardDescription className="text-muted-foreground">סטטיסטיקות ודוחות מפורטים</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <BarChart3 className="h-12 w-12 text-muted" />
+                    <p className="text-muted-foreground">דוחות מפורטים יתווספו בגרסה הבאה</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </ProtectedRoute>
   )
 }

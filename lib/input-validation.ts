@@ -1,61 +1,68 @@
-// This file contains utility functions for input validation.
-
 export const inputValidation = {
   /**
-   * Validates if a string is a valid email format.
+   * Validates an email address.
    * @param email The email string to validate.
-   * @returns True if valid, false otherwise.
+   * @returns True if the email is valid, false otherwise.
    */
-  isValidEmail(email: string): boolean {
+  isValidEmail: (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
   },
 
   /**
-   * Validates if a string is not empty and optionally meets a minimum length.
-   * @param value The string to validate.
-   * @param minLength Optional minimum length.
-   * @returns True if valid, false otherwise.
+   * Validates a password based on complexity requirements.
+   * Requires at least 8 characters, one uppercase, one lowercase, one number, one special character.
+   * @param password The password string to validate.
+   * @returns True if the password is valid, false otherwise.
    */
-  isNotEmpty(value: string | null | undefined, minLength = 1): boolean {
-    return typeof value === "string" && value.trim().length >= minLength
+  isValidPassword: (password: string): boolean => {
+    const minLength = 8
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasLowercase = /[a-z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+
+    return password.length >= minLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar
   },
 
   /**
-   * Validates if a string is a valid phone number format (basic check).
+   * Validates a phone number (simple check for digits and common length).
    * @param phone The phone number string to validate.
-   * @returns True if valid, false otherwise.
+   * @returns True if the phone number is valid, false otherwise.
    */
-  isValidPhone(phone: string): boolean {
-    const phoneRegex = /^\+?\d{7,15}$/ // Basic regex for 7-15 digits, optional leading +
+  isValidPhone: (phone: string): boolean => {
+    const phoneRegex = /^\+?\d{7,15}$/ // Allows optional + and 7-15 digits
     return phoneRegex.test(phone)
   },
 
   /**
-   * Validates if a number is positive.
-   * @param num The number to validate.
-   * @returns True if positive, false otherwise.
+   * Validates a serial number.
+   * Assumes serial numbers can be alphanumeric and typically have a certain length range.
+   * This is a generic validation; specific formats might require more precise regex.
+   * @param serialNumber The serial number string to validate.
+   * @returns True if the serial number is valid, false otherwise.
    */
-  isPositiveNumber(num: number): boolean {
-    return typeof num === "number" && num > 0
+  isValidSerialNumber: (serialNumber: string): boolean => {
+    // Example: alphanumeric, 5 to 20 characters long
+    const serialNumberRegex = /^[a-zA-Z0-9]{5,20}$/
+    return serialNumberRegex.test(serialNumber)
   },
 
   /**
-   * Validates if a string is a valid UUID (basic check).
-   * @param uuid The UUID string to validate.
-   * @returns True if valid, false otherwise.
-   */
-  isValidUUID(uuid: string): boolean {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    return uuidRegex.test(uuid)
-  },
-
-  /**
-   * Sanitizes a string by removing leading/trailing whitespace.
-   * @param value The string to sanitize.
+   * Sanitizes a string to prevent XSS attacks.
+   * @param input The string to sanitize.
    * @returns The sanitized string.
    */
-  sanitizeString(value: string): string {
-    return value.trim()
+  sanitizeString: (input: string): string => {
+    const map: { [key: string]: string } = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#x27;",
+      "/": "&#x2F;",
+    }
+    const reg = /[&<>"'/]/gi
+    return input.replace(reg, (match) => map[match])
   },
 }

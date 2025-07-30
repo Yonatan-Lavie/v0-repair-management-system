@@ -22,66 +22,6 @@ export class RepairStatusManager {
     return RepairStatusManager.instance
   }
 
-  // Define the possible statuses for a repair item
-  statuses = {
-    PENDING_INSPECTION: "בבדיקה",
-    IN_REPAIR: "בתיקון",
-    COMPLETED: "הושלם",
-    DELIVERED: "נמסר",
-    CANCELLED: "בוטל",
-  }
-
-  /**
-   * Returns the display name for a given status key.
-   * @param statusKey The internal status key (e.g., "PENDING_INSPECTION").
-   * @returns The localized display name (e.g., "בבדיקה").
-   */
-  getDisplayStatus(statusKey: string): string {
-    const key = Object.keys(this.statuses).find((k) => this.statuses[k as keyof typeof this.statuses] === statusKey)
-    return key ? this.statuses[key as keyof typeof this.statuses] : statusKey // Return key if not found
-  }
-
-  /**
-   * Returns the internal status key for a given display name.
-   * @param displayName The localized display name (e.g., "בבדיקה").
-   * @returns The internal status key (e.g., "PENDING_INSPECTION").
-   */
-  getStatusKey(displayName: string): string {
-    const key = Object.keys(this.statuses).find((k) => this.statuses[k as keyof typeof this.statuses] === displayName)
-    return key || displayName // Return display name if not found
-  }
-
-  /**
-   * Returns a list of all available status display names.
-   * @returns An array of status display names.
-   */
-  getAllStatuses(): string[] {
-    return Object.values(this.statuses)
-  }
-
-  /**
-   * Returns a Tailwind CSS class for a given status to apply color styling.
-   * @param statusKey The internal status key or display name.
-   * @returns A string of Tailwind CSS classes.
-   */
-  getStatusColorClass(statusKey: string): string {
-    const displayStatus = this.getDisplayStatus(statusKey)
-    switch (displayStatus) {
-      case this.statuses.PENDING_INSPECTION:
-        return "bg-yellow-500/20 text-yellow-700 border-yellow-500"
-      case this.statuses.IN_REPAIR:
-        return "bg-blue-500/20 text-blue-700 border-blue-500"
-      case this.statuses.COMPLETED:
-        return "bg-green-500/20 text-green-700 border-green-500"
-      case this.statuses.DELIVERED:
-        return "bg-green-500/20 text-green-700 border-green-500"
-      case this.statuses.CANCELLED:
-        return "bg-red-500/20 text-red-700 border-red-500"
-      default:
-        return "bg-gray-500/20 text-gray-700 border-gray-500"
-    }
-  }
-
   // Update repair status
   updateStatus(repairId: string, newStatus: string, updatedBy: string): boolean {
     try {
@@ -106,19 +46,19 @@ export class RepairStatusManager {
 
       let newStep = ""
       switch (newStatus) {
-        case this.statuses.PENDING_INSPECTION:
+        case "התקבל":
           newStep = "התקבל בסדנה"
           break
-        case this.statuses.IN_REPAIR:
+        case "בתהליך תיקון":
           newStep = "בתהליך תיקון"
           break
-        case this.statuses.COMPLETED:
+        case "תוקן - מוכן לשילוח":
           newStep = "הושלם - ממתין לשילוח"
           break
         case "ממתין לאיסוף": // This status is typically set by technician/shop-manager after repair is done and sent back to shop
           newStep = "מוכן לאיסוף בחנות"
           break
-        case this.statuses.DELIVERED: // This status means picked up by customer
+        case "הושלם": // This status means picked up by customer
           newStep = "נאסף על ידי לקוח"
           break
         default:
@@ -172,17 +112,17 @@ export class RepairStatusManager {
   // Get appropriate notifications for status
   private getNotificationsForStatus(status: string) {
     const notificationMap: Record<string, any[]> = {
-      [this.statuses.PENDING_INSPECTION]: [
+      התקבל: [
         { type: "customer", message: "התכשיט שלך התקבל בסדנה" }, // Updated message
         { type: "technician", message: "תיקון תכשיט חדש הוקצה אליך" }, // Updated message
       ],
-      [this.statuses.IN_REPAIR]: [{ type: "customer", message: "תיקון התכשיט החל - נעדכן אותך בהמשך" }], // Updated message
-      [this.statuses.COMPLETED]: [{ type: "shop", message: "תיקון תכשיט הושלם וחוזר לחנות" }], // Updated message
+      "בתהליך תיקון": [{ type: "customer", message: "תיקון התכשיט החל - נעדכן אותך בהמשך" }], // Updated message
+      "תוקן - מוכן לשילוח": [{ type: "shop", message: "תיקון תכשיט הושלם וחוזר לחנות" }], // Updated message
       "ממתין לאיסוף": [
         { type: "customer", message: "התכשיט מוכן לאיסוף!" }, // Updated message
         { type: "seller", message: "תכשיט מוכן למסירה ללקוח" }, // Updated message
       ],
-      [this.statuses.DELIVERED]: [{ type: "customer", message: "תודה שבחרת בנו!" }],
+      הושלם: [{ type: "customer", message: "תודה שבחרת בנו!" }],
     }
 
     return notificationMap[status] || []
@@ -194,8 +134,8 @@ export class RepairStatusManager {
       נוצר: ["נשלח לסדנה", "בוטל"], // Changed "לתיקון" to "לסדנה"
       "נשלח לסדנה": ["התקבל", "בוטל"], // Changed "לתיקון" to "לסדנה"
       התקבל: ["בתהליך תיקון", "בוטל"],
-      [this.statuses.IN_REPAIR]: ["תוקן - מוכן לשילוח", "דורש חלקים", "בעיה טכנית"],
-      [this.statuses.COMPLETED]: ["ממתין לאיסוף"],
+      "בתהליך תיקון": ["תוקן - מוכן לשילוח", "דורש חלקים", "בעיה טכנית"],
+      "תוקן - מוכן לשילוח": ["ממתין לאיסוף"],
       "ממתין לאיסוף": ["הושלם"],
       "דורש חלקים": ["בתהליך תיקון", "בוטל"],
       "בעיה טכנית": ["בתהליך תיקון", "בוטל"],
@@ -210,8 +150,8 @@ export class RepairStatusManager {
       נוצר: ["נשלח לסדנה"], // Changed "לתיקון" to "לסדנה"
       "נשלח לסדנה": ["התקבל"], // Changed "לתיקון" to "לסדנה"
       התקבל: ["בתהליך תיקון"],
-      [this.statuses.IN_REPAIR]: ["תוקן - מוכן לשילוח", "דורש חלקים", "בעיה טכנית"],
-      [this.statuses.COMPLETED]: ["ממתין לאיסוף"],
+      "בתהליך תיקון": ["תוקן - מוכן לשילוח", "דורש חלקים", "בעיה טכנית"],
+      "תוקן - מוכן לשילוח": ["ממתין לאיסוף"],
       "ממתין לאיסוף": ["הושלם"],
       "דורש חלקים": ["בתהליך תיקון"],
       "בעיה טכנית": ["בתהליך תיקון"],
@@ -223,8 +163,8 @@ export class RepairStatusManager {
   // Calculate repair duration
   calculateRepairDuration(repairId: string): number {
     const history = this.getStatusHistory(repairId)
-    const startUpdate = history.find((h) => h.newStatus === this.statuses.PENDING_INSPECTION)
-    const endUpdate = history.find((h) => h.newStatus === this.statuses.COMPLETED)
+    const startUpdate = history.find((h) => h.newStatus === "התקבל")
+    const endUpdate = history.find((h) => h.newStatus === "הושלם")
 
     if (!startUpdate || !endUpdate) return 0
 
@@ -271,4 +211,4 @@ export class RepairStatusManager {
 }
 
 // Export singleton instance
-export const statusManagerInstance = RepairStatusManager.getInstance()
+export const statusManager = RepairStatusManager.getInstance()

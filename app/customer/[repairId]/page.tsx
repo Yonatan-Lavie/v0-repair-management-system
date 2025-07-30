@@ -1,224 +1,231 @@
-import ProtectedRoute from "@/components/auth/protected-route"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import {
-  Timeline,
-  TimelineItem,
-  TimelineConnector,
-  TimelineHeader,
-  TimelineIcon,
-  TimelineContent,
-} from "@/components/ui/timeline"
-import {
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  Clock,
-  Package,
-  User,
-  Tag,
-  Calendar,
-  DollarSign,
-  Info,
-  MapPin,
-} from "lucide-react"
-import { demoData } from "@/lib/demo-data"
-import { statusManager } from "@/lib/status-manager"
-import { notFound } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { QrCode, Clock, CheckCircle, Package, Wrench } from "lucide-react" // Added Gem icon
+import { useParams } from "next/navigation"
+import { qrSecurity } from "@/lib/qr-security"
 
-interface RepairDetailsPageProps {
-  params: {
-    repairId: string
-  }
-}
+// Import the demo data at the top
+import { demoData, getDemoData } from "@/lib/demo-data"
 
-export default async function CustomerRepairDetailsPage({ params }: RepairDetailsPageProps) {
-  const repair = demoData.repairs.find((r) => r.id === params.repairId)
+// Replace the mockCustomerData with:
+const mockCustomerData = Object.fromEntries(
+  demoData.repairs.map((repair) => {
+    const product = getDemoData.getProduct(repair.productId)
+    const customer = getDemoData.getCustomer(repair.customerId)
 
-  if (!repair) {
-    notFound()
+    return [
+      repair.repairId,
+      {
+        repairId: repair.repairId,
+        customerName: customer?.name || "לא ידוע",
+        product: `${product?.brand || ""} ${product?.model || ""} ${product?.type || ""}`.trim(),
+        issue: repair.issue,
+        status: repair.status,
+        createdAt: new Date(repair.createdAt).toLocaleDateString("he-IL"),
+        estimatedCompletion: repair.estimatedCompletion,
+        timeline: getDemoData.getRepairTimeline(repair.repairId),
+        qrCustomer: qrSecurity.generateSecureQRURL({
+          repairId: repair.repairId,
+          type: "customer",
+          customerId: repair.customerId,
+          shopId: repair.shopId,
+          productType: product?.type,
+          productBrand: product?.brand,
+          productModel: product?.model,
+          serialNumber: (product as any)?.serialNumber,
+        }),
+      },
+    ]
+  }),
+)
+
+export default function CustomerTracking() {
+  const params = useParams()
+  const repairId = params.repairId as string
+  const [repairData, setRepairData] = useState<any>(null)
+  const [showQR, setShowQR] = useState(false)
+
+  useEffect(() => {
+    const data = mockCustomerData[repairId as keyof typeof mockCustomerData]
+    if (data) {
+      setRepairData(data)
+    }
+  }, [repairId])
+
+  if (!repairData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-lg border-none">
+          <CardContent className="text-center py-8 text-muted-foreground">
+            <p>תיקון לא נמצא</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "בבדיקה":
-        return <CircleDashed className="h-4 w-4" />
-      case "בתיקון":
-        return <Clock className="h-4 w-4" />
-      case "הושלם":
-        return <CircleCheck className="h-4 w-4" />
-      case "נמסר":
-        return <CircleCheck className="h-4 w-4" />
-      case "בוטל":
-        return <CircleX className="h-4 w-4" />
+      case "ממתין לאיסוף":
+        return <Package className="h-5 w-5 text-green-600" />
+      case "בתהליך תיקון":
+        return <Wrench className="h-5 w-5 text-primary" />
       default:
-        return <Info className="h-4 w-4" />
+        return <Clock className="h-5 w-5 text-muted-foreground" />
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "בבדיקה":
-        return "bg-yellow-100 text-yellow-800"
-      case "בתיקון":
-        return "bg-blue-100 text-blue-800"
-      case "הושלם":
-        return "bg-green-100 text-green-800"
-      case "נמסר":
-        return "bg-green-100 text-green-800"
-      case "בוטל":
-        return "bg-red-100 text-red-800"
+      case "ממתין לאיסוף":
+        return "default"
+      case "בתהליך תיקון":
+        return "secondary"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "outline"
     }
   }
 
-  const shop = demoData.shops.find((s) => s.id === repair.shopId)
-  const assignedTechnician = demoData.users.find((u) => u.id === repair.assignedTo)
-
   return (
-    <ProtectedRoute>
-      <div className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-6 text-center">סטטוס תיקון תכשיט</h1>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-card shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6 text-center">
+            <h1 className="text-3xl font-bold text-foreground">מעקב תיקון תכשיט</h1>
+            <p className="text-muted-foreground mt-2">שלום {repairData.customerName}</p>
+          </div>
+        </div>
+      </div>
 
-        <Card className="max-w-4xl mx-auto shadow-lg border-none">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Status Card */}
+        <Card className="mb-8 shadow-lg border-none">
           <CardHeader className="pb-4">
-            <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
-              <Package className="w-6 h-6" /> תיקון מספר: {repair.id}
-            </CardTitle>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge className={`${getStatusColor(repair.status)} text-sm font-medium`}>
-                {statusManager.getDisplayStatus(repair.status)}
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                  {getStatusIcon(repairData.status)}
+                  מזהה תיקון: {repairData.repairId}
+                </CardTitle>
+                <CardDescription className="mt-2 text-muted-foreground">
+                  {repairData.product} - {repairData.issue}
+                </CardDescription>
+              </div>
+              <Badge variant={getStatusColor(repairData.status)} className="text-lg px-4 py-2 font-semibold">
+                {repairData.status}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Repair Details */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <User className="w-4 h-4" /> שם לקוח:
-                  </p>
-                  <p className="font-medium text-foreground">{repair.customerName}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <Tag className="w-4 h-4" /> סוג תכשיט:
-                  </p>
-                  <p className="font-medium text-foreground">{repair.itemType}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <Info className="w-4 h-4" /> תיאור תקלה:
-                  </p>
-                  <p className="font-medium text-foreground">{repair.issueDescription}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <DollarSign className="w-4 h-4" /> עלות משוערת:
-                  </p>
-                  <p className="font-medium text-foreground">₪{repair.estimatedCost.toFixed(2)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <Calendar className="w-4 h-4" /> תאריך פתיחה:
-                  </p>
-                  <p className="font-medium text-foreground">
-                    {new Date(repair.createdAt).toLocaleDateString("he-IL")}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm flex items-center gap-1">
-                    <Calendar className="w-4 h-4" /> עדכון אחרון:
-                  </p>
-                  <p className="font-medium text-foreground">
-                    {new Date(repair.updatedAt).toLocaleDateString("he-IL")}
-                  </p>
-                </div>
-                {assignedTechnician && (
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground text-sm flex items-center gap-1">
-                      <User className="w-4 h-4" /> צורף/טכנאי אחראי:
-                    </p>
-                    <p className="font-medium text-foreground">{assignedTechnician.name}</p>
-                  </div>
-                )}
-                {shop && (
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground text-sm flex items-center gap-1">
-                      <MapPin className="w-4 h-4" /> חנות:
-                    </p>
-                    <p className="font-medium text-foreground">{shop.name}</p>
-                  </div>
-                )}
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-muted-foreground">
+              <div>
+                <p className="text-sm">תאריך יצירה</p>
+                <p className="font-semibold text-foreground">{repairData.createdAt}</p>
               </div>
-
-              <Separator className="my-6 bg-border" />
-
-              {/* Repair History Timeline */}
-              <h3 className="text-xl font-bold text-secondary-foreground mb-4">היסטוריית סטטוס</h3>
-              <Timeline>
-                {repair.history.map((entry, index) => (
-                  <TimelineItem key={index}>
-                    <TimelineConnector />
-                    <TimelineHeader>
-                      <TimelineIcon className="bg-primary text-primary-foreground">
-                        {getStatusIcon(entry.status)}
-                      </TimelineIcon>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-foreground">
-                          {statusManager.getDisplayStatus(entry.status)}
-                        </h4>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(entry.timestamp).toLocaleString("he-IL")}
-                        </span>
-                      </div>
-                    </TimelineHeader>
-                    <TimelineContent className="text-muted-foreground">
-                      {entry.notes && <p>{entry.notes}</p>}
-                      <p className="text-xs">ע"י: {entry.by}</p>
-                    </TimelineContent>
-                  </TimelineItem>
-                ))}
-              </Timeline>
-            </div>
-
-            {/* Contact Information */}
-            <div className="lg:col-span-1 space-y-6">
-              <Card className="bg-secondary/10 border border-secondary shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-bold text-secondary-foreground">פרטי יצירת קשר</CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground text-sm space-y-2">
-                  <p>
-                    <span className="font-medium text-foreground">טלפון:</span> {repair.customerPhone}
-                  </p>
-                  <p>
-                    <span className="font-medium text-foreground">מייל:</span> {repair.customerEmail || "לא סופק"}
-                  </p>
-                  {shop && (
-                    <>
-                      <Separator className="my-2 bg-border" />
-                      <h4 className="font-semibold text-foreground">פרטי החנות:</h4>
-                      <p>
-                        <span className="font-medium text-foreground">שם:</span> {shop.name}
-                      </p>
-                      <p>
-                        <span className="font-medium text-foreground">כתובת:</span> {shop.address}
-                      </p>
-                      <p>
-                        <span className="font-medium text-foreground">טלפון:</span> {shop.phone}
-                      </p>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+              <div>
+                <p className="text-sm">זמן משוער להשלמה</p>
+                <p className="font-semibold text-foreground">{repairData.estimatedCompletion}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Timeline */}
+        <Card className="mb-8 shadow-lg border-none">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl font-bold text-foreground">מעקב התקדמות</CardTitle>
+            <CardDescription className="text-muted-foreground">סטטוס התיקון לאורך זמן</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-6">
+              {repairData.timeline.map((item: any, index: number) => (
+                <div key={index} className="flex items-center gap-4">
+                  <div className={`w-4 h-4 rounded-full ${item.completed ? "bg-primary" : "bg-muted"}`}></div>
+                  <div className="flex-1">
+                    <p className={`font-medium ${item.completed ? "text-foreground" : "text-muted-foreground"}`}>
+                      {item.step}
+                    </p>
+                    {item.date && <p className="text-sm text-muted-foreground">{item.date}</p>}
+                  </div>
+                  {item.completed && <CheckCircle className="h-5 w-5 text-green-500" />}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* QR Code for Pickup */}
+        {repairData.status === "ממתין לאיסוף" && (
+          <Card className="shadow-lg border-none">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <QrCode className="h-6 w-6 text-primary" />
+                QR לאיסוף התכשיט
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">הצג QR זה בחנות לאיסוף התכשיט המתוקן</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="text-center">
+                {!showQR ? (
+                  <div className="space-y-4">
+                    <div className="bg-green-50/20 border border-green-200 rounded-lg p-4 text-green-800">
+                      <p className="font-semibold">🎉 התכשיט שלך מוכן לאיסוף!</p>
+                      <p className="text-green-700 text-sm mt-1">בוא לחנות עם QR זה לאיסוף התכשיט</p>
+                    </div>
+                    <Button
+                      onClick={() => setShowQR(true)}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      הצג QR לאיסוף
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <img
+                      src={repairData.qrCustomer || "/placeholder.svg"}
+                      alt="QR Code for Customer Pickup"
+                      className="mx-auto border-2 border-muted rounded-lg p-2"
+                    />
+                    <div className="bg-secondary/20 border border-secondary rounded-lg p-4 text-secondary-foreground">
+                      <p className="text-sm">💡 הצג QR זה למוכר בחנות לאימות זהותך ואיסוף התכשיט</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowQR(false)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      הסתר QR
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* In Progress Message */}
+        {repairData.status === "בתהליך תיקון" && (
+          <Card className="shadow-lg border-none">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <Wrench className="h-6 w-6 text-primary" />
+                התיקון בעיצומו
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="bg-secondary/20 border border-secondary rounded-lg p-4 text-secondary-foreground">
+                <p>🔧 התכשיט שלך נמצא כרגע בתהליך תיקון בסדנה</p>
+                <p className="text-sm mt-2">נעדכן אותך ברגע שהתיקון יושלם</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
-    </ProtectedRoute>
+    </div>
   )
 }

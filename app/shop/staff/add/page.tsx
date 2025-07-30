@@ -1,196 +1,248 @@
-import ProtectedRoute from "@/components/auth/protected-route"
-import PermissionGuard from "@/components/auth/permission-guard"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+"use client"
+
 import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, UserPlus, CheckCircle } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import { createUser as createUserAction } from "@/app/actions/user" // Assuming a user action exists
-import { getCurrentSession } from "@/app/actions/auth" // Import auth action
-import { UserPlus, Loader2 } from "lucide-react"
-;("use client")
 
-import type React from "react"
-
-export default function AddStaffPage() {
+export default function AddSeller() {
   const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    password: "",
+    phone: "",
     role: "",
-    shopId: "", // Will be set from session
-    status: "פעיל",
+    password: "",
+    confirmPassword: "",
+    notes: "",
   })
 
-  // Fetch current session on client side to get shopId
-  useState(() => {
-    const fetchSession = async () => {
-      const session = await getCurrentSession()
-      if (session?.user.shopId) {
-        setFormData((prev) => ({ ...prev, shopId: session.user.shopId }))
-      } else {
-        // Handle case where shopId is not available (e.g., redirect or show error)
-        toast({
-          title: "שגיאה",
-          description: "לא ניתן להוסיף עובד ללא שיוך לחנות.",
-          variant: "destructive",
-        })
-        router.push("/shop/dashboard") // Redirect back
-      }
-    }
-    fetchSession()
-  })
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { id, value } = e.target
-    setFormData((prev) => ({ ...prev, [id]: value }))
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSelectChange = (id: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [id]: value }))
+  const handleSubmit = () => {
+    // In a real app, this would create the user
+    setStep(2)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    try {
-      const newStaffMember = {
-        id: `USER${Date.now()}`,
-        ...formData,
-        permissions: [], // Permissions will be set by role on server
-      }
-
-      const result = await createUserAction(newStaffMember) // Call server action
-
-      if (result.success) {
-        toast({
-          title: "עובד נוסף בהצלחה!",
-          description: `העובד ${newStaffMember.name} נוסף לחנות.`,
-        })
-        router.push("/shop/dashboard") // Or to a staff list page
-      } else {
-        toast({
-          title: "שגיאה בהוספת עובד",
-          description: result.error || "נסה שוב מאוחר יותר.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Failed to add staff member:", error)
-      toast({
-        title: "שגיאה בלתי צפויה",
-        description: "אירעה שגיאה בעת הוספת העובד.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handleComplete = () => {
+    router.push("/shop/dashboard")
   }
 
   return (
-    <ProtectedRoute allowedRoles={["shop-manager"]}>
-      <PermissionGuard permission="staff:write">
-        <div className="container mx-auto py-8 px-4">
-          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">הוספת עובד חדש לחנות</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center py-4">
+            <Button variant="ghost" size="sm" asChild className="mr-4">
+              <Link href="/shop/dashboard">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                חזור
+              </Link>
+            </Button>
+            <UserPlus className="h-8 w-8 text-blue-600 mr-3" />
+            <h1 className="text-2xl font-bold text-gray-900">הוספת עובד חדש</h1>
+          </div>
+        </div>
+      </div>
 
-          <Card className="max-w-2xl mx-auto shadow-lg border-none">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
-                <UserPlus className="w-6 h-6" /> פרטי עובד
-              </CardTitle>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {step === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>פרטי העובד החדש</CardTitle>
+              <CardDescription>הזן את פרטי העובד החדש שיתווסף לחנות</CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">שם מלא</Label>
+                  <Label htmlFor="firstName">שם פרטי</Label>
                   <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="text-foreground"
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange("firstName", e.target.value)}
+                    placeholder="הכנס שם פרטי"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">שם משפחה</Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange("lastName", e.target.value)}
+                    placeholder="הכנס שם משפחה"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="email">כתובת מייל</Label>
                   <Input
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                    className="text-foreground"
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    placeholder="example@email.com"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">טלפון</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    placeholder="050-1234567"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">תפקיד</Label>
+                <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר תפקיד" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="seller">מוכר</SelectItem>
+                    <SelectItem value="technician">טכנאי</SelectItem>
+                    <SelectItem value="shop-manager">מנהל חנות</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="password">סיסמה</Label>
                   <Input
                     id="password"
                     type="password"
                     value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                    className="text-foreground"
+                    onChange={(e) => handleInputChange("password", e.target.value)}
+                    placeholder="הכנס סיסמה"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="role">תפקיד</Label>
-                  <Select onValueChange={(value) => handleSelectChange("role", value)} value={formData.role} required>
-                    <SelectTrigger id="role" className="text-foreground">
-                      <SelectValue placeholder="בחר תפקיד" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="seller">מוכר</SelectItem>
-                      <SelectItem value="technician">צורף/טכנאי</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="confirmPassword">אישור סיסמה</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                    placeholder="אשר סיסמה"
+                  />
                 </div>
-                {/* ShopId is pre-filled from session, not user input */}
-                <div className="space-y-2">
-                  <Label htmlFor="status">סטטוס</Label>
-                  <Select
-                    onValueChange={(value) => handleSelectChange("status", value)}
-                    value={formData.status}
-                    required
-                  >
-                    <SelectTrigger id="status" className="text-foreground">
-                      <SelectValue placeholder="בחר סטטוס" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="פעיל">פעיל</SelectItem>
-                      <SelectItem value="לא פעיל">לא פעיל</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              </div>
 
-                <div className="md:col-span-2 flex justify-end mt-6">
-                  <Button
-                    type="submit"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        מוסיף עובד...
-                      </>
-                    ) : (
-                      "הוסף עובד"
-                    )}
-                  </Button>
-                </div>
-              </form>
+              <div className="space-y-2">
+                <Label htmlFor="notes">הערות (אופציונלי)</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => handleInputChange("notes", e.target.value)}
+                  placeholder="הערות נוספות על העובד..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-2">הרשאות לפי תפקיד:</h4>
+                <ul className="text-blue-800 text-sm space-y-1">
+                  <li>
+                    <strong>מוכר:</strong> יצירת תיקונים, סריקת QR, מסירת מוצרים
+                  </li>
+                  <li>
+                    <strong>טכנאי:</strong> קבלת תיקונים, עדכון סטטוס, מידע מוגבל על לקוחות
+                  </li>
+                  <li>
+                    <strong>מנהל חנות:</strong> כל ההרשאות + ניהול צוות ודוחות
+                  </li>
+                </ul>
+              </div>
+
+              <Button
+                onClick={handleSubmit}
+                className="w-full"
+                disabled={
+                  !formData.firstName ||
+                  !formData.lastName ||
+                  !formData.email ||
+                  !formData.role ||
+                  !formData.password ||
+                  formData.password !== formData.confirmPassword
+                }
+              >
+                צור עובד חדש
+              </Button>
             </CardContent>
           </Card>
-        </div>
-      </PermissionGuard>
-    </ProtectedRoute>
+        )}
+
+        {step === 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                עובד נוצר בהצלחה!
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {formData.firstName} {formData.lastName} נוסף לצוות!
+                </h3>
+                <p className="text-gray-600 mb-6">העובד החדש יכול כעת להתחבר למערכת</p>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">מייל:</p>
+                      <p className="font-semibold">{formData.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">תפקיד:</p>
+                      <p className="font-semibold">
+                        {formData.role === "seller" && "מוכר"}
+                        {formData.role === "technician" && "טכנאי"}
+                        {formData.role === "shop-manager" && "מנהל חנות"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <p className="text-blue-800 text-sm">
+                    ✅ נשלח מייל עם פרטי התחברות לעובד החדש
+                    <br />✅ העובד יכול להתחבר באמצעות המייל והסיסמה שהוגדרו
+                  </p>
+                </div>
+
+                <div className="flex gap-4">
+                  <Button onClick={() => setStep(1)} variant="outline" className="flex-1 bg-transparent">
+                    הוסף עובד נוסף
+                  </Button>
+                  <Button onClick={handleComplete} className="flex-1">
+                    חזור לדשבורד
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   )
 }

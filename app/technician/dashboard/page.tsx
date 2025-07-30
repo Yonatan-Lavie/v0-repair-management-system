@@ -1,118 +1,383 @@
-import ProtectedRoute from "@/components/auth/protected-route"
-import PermissionGuard from "@/components/auth/permission-guard"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Clock, CheckCircle, XCircle, Package, Hammer } from "lucide-react"
-import { demoData } from "@/lib/demo-data"
-import { statusManager } from "@/lib/status-manager"
-import { getCurrentSession } from "@/app/actions/auth" // Import auth action
-import { redirect } from "next/navigation"
+"use client"
 
-export default async function TechnicianDashboardPage() {
-  const session = await getCurrentSession()
-  if (!session || !session.user.shopId) {
-    redirect("/login")
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Wrench, Scan, Clock, CheckCircle, Package } from "lucide-react" // Added Gem icon
+import Link from "next/link"
+import { ProtectedRoute } from "@/components/auth/protected-route"
+import { authManager } from "@/lib/auth"
+import { statusManager } from "@/lib/status-manager"
+
+// Import the demo data at the top
+import { demoData, getDemoData } from "@/lib/demo-data"
+
+// Replace the mockTechnicianData with:
+const mockTechnicianData = {
+  stats: {
+    assignedRepairs: 5,
+    inProgress: 2,
+    completedToday: 3,
+    avgRepairTime: "2.1 ימים",
+  },
+  assignedRepairs: demoData.repairs
+    .filter((repair) => repair.assignedTechnician === "יוסי בן-חיים")
+    .map((repair) => ({
+      repairId: repair.repairId,
+      product:
+        `${getDemoData.getProduct(repair.productId)?.brand || ""} ${getDemoData.getProduct(repair.productId)?.model || ""} ${getDemoData.getProduct(repair.productId)?.type || ""}`.trim(),
+      issue: repair.issue,
+      status: repair.status,
+      receivedAt: new Date(repair.createdAt).toLocaleDateString("he-IL"),
+      priority: repair.priority,
+    })),
+}
+
+export default function TechnicianDashboard() {
+  const [username, setUsername] = useState("")
+
+  useEffect(() => {
+    setUsername(authManager.getCurrentSession()?.user.name || "טכנאי")
+  }, [])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "התקבל":
+        return "secondary"
+      case "בתהליך תיקון":
+        return "default"
+      case "תוקן - מוכן לשילוח":
+        return "outline"
+      default:
+        return "default"
+    }
   }
 
-  const userShopId = session.user.shopId
-  const technicianId = session.user.id
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "גבוה":
+        return "destructive"
+      case "רגיל":
+        return "default"
+      case "נמוך":
+        return "secondary"
+      default:
+        return "default"
+    }
+  }
 
-  const assignedRepairs = demoData.repairs.filter((r) => r.assignedTo === technicianId && r.shopId === userShopId)
+  const updateRepairStatus = (repairId: string, newStatus: string) => {
+    const currentUser = authManager.getCurrentSession()?.user.name || "טכנאי לא ידוע"
+    statusManager.updateStatus(repairId, newStatus, currentUser)
+    // In a real app, you'd also update the local state or refetch data
+    console.log(`Updating ${repairId} to ${newStatus}`)
+  }
 
-  const totalAssignedRepairs = assignedRepairs.length
-  const pendingAssignedRepairs = assignedRepairs.filter((r) => r.status === "בבדיקה" || r.status === "בתיקון").length
-  const completedAssignedRepairs = assignedRepairs.filter((r) => r.status === "הושלם" || r.status === "נמסר").length
-  const cancelledAssignedRepairs = assignedRepairs.filter((r) => r.status === "בוטל").length
-
-  const recentAssignedRepairs = assignedRepairs
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
+  const handleLogout = async () => {
+    await authManager.logout()
+    window.location.href = "/login"
+  }
 
   return (
-    <ProtectedRoute allowedRoles={["technician", "shop-manager"]}>
-      <PermissionGuard permission="repairs:read">
-        <div className="container mx-auto py-8 px-4">
-          <h1 className="text-3xl font-bold text-foreground mb-6 text-center">לוח מחוונים - צורף/טכנאי</h1>
+    <ProtectedRoute requiredRole="technician">
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="bg-card shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center gap-3">
+                <Wrench className="h-8 w-8 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">פאנל צורף/טכנאי</h1>
+                  <p className="text-muted-foreground">שלום, {username}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Link href="/technician/scan">
+                    <Scan className="h-4 w-4 mr-2" />
+                    סרוק QR
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="text-muted-foreground hover:text-foreground bg-transparent"
+                >
+                  יציאה
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-md border-none bg-gradient-to-br from-primary/10 to-primary/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <Card className="shadow-lg border-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-primary">תיקונים שהוקצו</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">תיקונים שהוקצו</CardTitle>
                 <Package className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{totalAssignedRepairs}</div>
-                <p className="text-xs text-muted-foreground">סה"כ תיקונים שהוקצו לך</p>
+                <div className="text-2xl font-bold text-foreground">{mockTechnicianData.stats.assignedRepairs}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-yellow-100/10 to-yellow-100/5">
+
+            <Card className="shadow-lg border-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-yellow-700">תיקונים פעילים</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-700" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">בתהליך</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{pendingAssignedRepairs}</div>
-                <p className="text-xs text-muted-foreground">בבדיקה או בתיקון</p>
+                <div className="text-2xl font-bold text-foreground">{mockTechnicianData.stats.inProgress}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-green-100/10 to-green-100/5">
+
+            <Card className="shadow-lg border-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-green-700">תיקונים שהושלמו</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-700" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">הושלמו היום</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{completedAssignedRepairs}</div>
-                <p className="text-xs text-muted-foreground">הושלמו או נמסרו</p>
+                <div className="text-2xl font-bold text-foreground">{mockTechnicianData.stats.completedToday}</div>
               </CardContent>
             </Card>
-            <Card className="shadow-md border-none bg-gradient-to-br from-red-100/10 to-red-100/5">
+
+            <Card className="shadow-lg border-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-red-700">תיקונים שבוטלו</CardTitle>
-                <XCircle className="h-4 w-4 text-red-700" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">זמן ממוצע</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{cancelledAssignedRepairs}</div>
-                <p className="text-xs text-muted-foreground">תיקונים שבוטלו</p>
+                <div className="text-2xl font-bold text-foreground">{mockTechnicianData.stats.avgRepairTime}</div>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="shadow-lg border-none">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-secondary-foreground flex items-center gap-2">
-                <Hammer className="w-5 h-5" /> תיקונים שהוקצו לי
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>מספר תיקון</TableHead>
-                    <TableHead>לקוח</TableHead>
-                    <TableHead>תכשיט</TableHead>
-                    <TableHead>סטטוס</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentAssignedRepairs.map((repair) => (
-                    <TableRow key={repair.id}>
-                      <TableCell className="font-medium text-foreground">{repair.id}</TableCell>
-                      <TableCell className="text-muted-foreground">{repair.customerName}</TableCell>
-                      <TableCell className="text-muted-foreground">{repair.itemType}</TableCell>
-                      <TableCell>
-                        <Badge className={statusManager.getStatusColorClass(repair.status)}>
-                          {statusManager.getDisplayStatus(repair.status)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Scan className="h-5 w-5 text-primary" />
+                  סריקת QR תכשיט
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">סרוק QR של תכשיט שהתקבל לתיקון</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+                  <Link href="/technician/scan">פתח סורק</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <CheckCircle className="h-5 w-5 text-primary" />
+                  עדכון סטטוס
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">עדכן סטטוס תיקון קיים</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  className="w-full bg-transparent text-primary hover:bg-primary hover:text-primary-foreground"
+                  variant="outline"
+                >
+                  עדכן סטטוס
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <Tabs defaultValue="assigned" className="space-y-4">
+            <TabsList className="bg-muted">
+              <TabsTrigger
+                value="assigned"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                תיקונים שהוקצו
+              </TabsTrigger>
+              <TabsTrigger
+                value="in-progress"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                בתהליך
+              </TabsTrigger>
+              <TabsTrigger
+                value="completed"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                מוכנים לשילוח
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="assigned">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">כל התיקונים שהוקצו</CardTitle>
+                  <CardDescription className="text-muted-foreground">תכשיטים שהתקבלו לתיקון</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>מזהה תיקון</TableHead>
+                        <TableHead>תכשיט</TableHead>
+                        <TableHead>תקלה</TableHead>
+                        <TableHead>סטטוס</TableHead>
+                        <TableHead>עדיפות</TableHead>
+                        <TableHead>התקבל</TableHead>
+                        <TableHead>פעולות</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockTechnicianData.assignedRepairs.map((repair) => (
+                        <TableRow key={repair.repairId}>
+                          <TableCell className="font-medium text-foreground">{repair.repairId}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.product}</TableCell>
+                          <TableCell className="text-muted-foreground">{repair.issue}</TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusColor(repair.status)}>{repair.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getPriorityColor(repair.priority)}>{repair.priority}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{repair.receivedAt}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {repair.status === "התקבל" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateRepairStatus(repair.repairId, "בתהליך תיקון")}
+                                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                  התחל תיקון
+                                </Button>
+                              )}
+                              {repair.status === "בתהליך תיקון" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateRepairStatus(repair.repairId, "תוקן - מוכן לשילוח")}
+                                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                  סמן כמוכן
+                                </Button>
+                              )}
+                              {repair.status === "תוקן - מוכן לשילוח" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled
+                                  className="text-muted-foreground bg-transparent"
+                                >
+                                  מוכן לשילוח
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="in-progress">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">תיקונים בתהליך</CardTitle>
+                  <CardDescription className="text-muted-foreground">תכשיטים שנמצאים כרגע בתיקון</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>מזהה תיקון</TableHead>
+                        <TableHead>תכשיט</TableHead>
+                        <TableHead>תקלה</TableHead>
+                        <TableHead>התחיל</TableHead>
+                        <TableHead>פעולות</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockTechnicianData.assignedRepairs
+                        .filter((repair) => repair.status === "בתהליך תיקון")
+                        .map((repair) => (
+                          <TableRow key={repair.repairId}>
+                            <TableCell className="font-medium text-foreground">{repair.repairId}</TableCell>
+                            <TableCell className="text-muted-foreground">{repair.product}</TableCell>
+                            <TableCell className="text-muted-foreground">{repair.issue}</TableCell>
+                            <TableCell className="text-muted-foreground">{repair.receivedAt}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                onClick={() => updateRepairStatus(repair.repairId, "תוקן - מוכן לשילוח")}
+                                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                              >
+                                סמן כמוכן
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="completed">
+              <Card className="shadow-lg border-none">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-bold text-foreground">מוכנים לשילוח</CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    תיקונים שהושלמו וממתינים להחזרה לחנות
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>מזהה תיקון</TableHead>
+                        <TableHead>תכשיט</TableHead>
+                        <TableHead>הושלם</TableHead>
+                        <TableHead>פעולות</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockTechnicianData.assignedRepairs
+                        .filter((repair) => repair.status === "תוקן - מוכן לשילוח")
+                        .map((repair) => (
+                          <TableRow key={repair.repairId}>
+                            <TableCell className="font-medium text-foreground">{repair.repairId}</TableCell>
+                            <TableCell className="text-muted-foreground">{repair.product}</TableCell>
+                            <TableCell className="text-muted-foreground">{repair.receivedAt}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                                className="text-muted-foreground bg-transparent"
+                              >
+                                ממתין לאיסוף
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-      </PermissionGuard>
+      </div>
     </ProtectedRoute>
   )
 }

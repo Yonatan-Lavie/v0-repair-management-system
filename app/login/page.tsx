@@ -3,19 +3,17 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { LoginForm } from "@/components/auth/login-form"
-import { getCurrentSession } from "@/app/actions/auth" // Import getCurrentSession action
+import { authManager } from "@/lib/auth"
 
 export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const checkSession = async () => {
-      const session = await getCurrentSession()
-      if (session) {
-        redirectToRoleDashboard(session.user.role)
-      }
+    // Check if already logged in
+    const session = authManager.loadSession()
+    if (session) {
+      redirectToRoleDashboard(session.user.role)
     }
-    checkSession()
   }, [])
 
   const handleLoginSuccess = (session: any) => {

@@ -1,23 +1,34 @@
-import { redirect } from "next/navigation"
-import { getCurrentSession } from "@/app/actions/auth"
+"use client"
+import { useRouter } from "next/navigation"
+import { LoginForm } from "@/components/auth/login-form" // Import the new login form
 
-export default async function HomePage() {
-  const session = await getCurrentSession()
+export default function LoginPage() {
+  const router = useRouter()
 
-  if (session) {
+  const handleLoginSuccess = (session: any) => {
+    // Store role and username from session for demo purposes
+    localStorage.setItem("userRole", session.user.role)
+    localStorage.setItem("username", session.user.name)
+
+    // Redirect based on role
     switch (session.user.role) {
       case "admin":
-        redirect("/admin/dashboard")
+        router.push("/admin/dashboard")
+        break
       case "shop-manager":
-        redirect("/shop/dashboard")
+        router.push("/shop/dashboard")
+        break
       case "seller":
-        redirect("/seller/dashboard")
+        router.push("/seller/dashboard")
+        break
       case "technician":
-        redirect("/technician/dashboard")
+        router.push("/technician/dashboard")
+        break
       default:
-        redirect("/login")
+        break
     }
-  } else {
-    redirect("/login")
   }
+
+  // Render the new LoginForm component
+  return <LoginForm onSuccess={handleLoginSuccess} />
 }

@@ -1,21 +1,31 @@
-import { redirect } from "next/navigation"
-import { hasPermission as checkPermission } from "@/app/actions/auth"
+"use client"
+
 import type React from "react"
+
+import { authManager } from "@/lib/auth"
 
 interface PermissionGuardProps {
   children: React.ReactNode
-  permission: string
+  permission?: string
+  role?: string
   fallback?: React.ReactNode
 }
 
-export default async function PermissionGuard({ children, permission, fallback }: PermissionGuardProps) {
-  const hasRequiredPermission = await checkPermission(permission)
+export function PermissionGuard({ children, permission, role, fallback = null }: PermissionGuardProps) {
+  const session = authManager.getCurrentSession()
 
-  if (!hasRequiredPermission) {
-    if (fallback) {
-      return <>{fallback}</>
-    }
-    redirect("/unauthorized")
+  if (!session) {
+    return <>{fallback}</>
+  }
+
+  // Check role
+  if (role && !authManager.hasRole(role)) {
+    return <>{fallback}</>
+  }
+
+  // Check permission
+  if (permission && !authManager.hasPermission(permission)) {
+    return <>{fallback}</>
   }
 
   return <>{children}</>

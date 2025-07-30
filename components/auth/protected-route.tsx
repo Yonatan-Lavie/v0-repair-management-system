@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-import { redirect } from "next/navigation"
-import { getCurrentSession } from "@/app/actions/auth"
+
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { authManager, type User } from "@/lib/auth"
@@ -10,22 +9,12 @@ import { Loader2 } from "lucide-react"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  allowedRoles?: string[]
+  requiredPermissions?: string[]
+  requiredRole?: string
+  shopId?: string
 }
 
-export default async function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const session = await getCurrentSession()
-
-  if (!session) {
-    redirect("/login")
-  }
-
-  if (allowedRoles && allowedRoles.length > 0) {
-    if (!allowedRoles.includes(session.user.role)) {
-      redirect("/unauthorized")
-    }
-  }
-
+export function ProtectedRoute({ children, requiredPermissions = [], requiredRole, shopId }: ProtectedRouteProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -48,7 +37,21 @@ export default async function ProtectedRoute({ children, allowedRoles }: Protect
       const currentUser = session.user
 
       // Check role requirement
-      if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(currentUser.role)) {
+      if (requiredRole && currentUser.role !== requiredRole) {
+        router.push("/unauthorized")
+        return
+      }
+
+      // Check permissions
+      const hasAllPermissions = requiredPermissions.every((permission) => currentUser.permissions.includes(permission))
+
+      if (requiredPermissions.length > 0 && !hasAllPermissions) {
+        router.push("/unauthorized")
+        return
+      }
+
+      // Check shop access
+      if (shopId && !authManager.canAccessShop(shopId)) {
         router.push("/unauthorized")
         return
       }

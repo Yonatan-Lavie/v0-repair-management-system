@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff, Gem } from "lucide-react"
-import { login } from "@/app/actions/auth" // Import login action
+import { Loader2, Eye, EyeOff, Gem } from "lucide-react" // Changed icon to Gem
+import { authManager } from "@/lib/auth"
 
 interface LoginFormProps {
   onSuccess: (session: any) => void
@@ -30,13 +30,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     setError("")
 
     try {
-      const result = await login(formData.email, formData.password) // Call the server action
+      const result = await authManager.login(formData.email, formData.password)
 
       if (result.success && result.session) {
-        // Client-side storage for immediate use (cookie is HTTP-only)
-        localStorage.setItem("username", result.session.user.name)
-        localStorage.setItem("user_role", result.session.user.role)
-        localStorage.setItem("user_shop_id", result.session.user.shopId || "")
         onSuccess(result.session)
       } else {
         setError(result.error || "שגיאה בהתחברות")
@@ -59,14 +55,18 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <div className="text-center">
           <div className="flex justify-center mb-4">
             <div className="bg-primary p-3 rounded-full shadow-md">
-              <Gem className="h-8 w-8 text-primary-foreground" />
+              {" "}
+              {/* Changed background to primary */}
+              <Gem className="h-8 w-8 text-primary-foreground" /> {/* Changed icon to Gem */}
             </div>
           </div>
           <h1 className="text-3xl font-bold text-foreground">התחברות מאובטחת</h1>
-          <p className="text-muted-foreground mt-2">מערכת ניהול תיקוני תכשיטים</p>
+          <p className="text-muted-foreground mt-2">מערכת ניהול תיקוני תכשיטים</p> {/* Updated description */}
         </div>
 
         <Card className="shadow-lg border-none">
+          {" "}
+          {/* Added shadow and removed border */}
           <CardHeader className="pb-4">
             <CardTitle className="text-center text-2xl font-bold text-foreground">כניסה למערכת</CardTitle>
             <CardDescription className="text-center text-muted-foreground">הזן את פרטי ההתחברות שלך</CardDescription>
@@ -136,6 +136,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             </form>
 
             <div className="mt-6 p-4 bg-secondary/20 border border-secondary rounded-lg text-secondary-foreground">
+              {" "}
+              {/* Changed background and border to secondary */}
               <h4 className="font-semibold mb-2">חשבונות לדמו:</h4>
               <div className="text-sm space-y-1">
                 <p>

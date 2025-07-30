@@ -1,37 +1,60 @@
-// This file provides a simple audit logging mechanism.
-// In a real application, this would persist logs to a database or a dedicated logging service.
-
 interface AuditLogEntry {
   timestamp: string
   userId: string
   userName: string
-  event: string
+  action: string
   details: Record<string, any>
-  ipAddress?: string // In a real app, this would be captured from the request
-  userAgent?: string // In a real app, this would be captured from the request
+  ipAddress?: string
 }
+
+// In a real application, this would interact with a database or a dedicated logging service.
+// For this demo, we'll just log to the console and keep a small in-memory array.
+const auditLogs: AuditLogEntry[] = []
+const MAX_LOGS = 100
 
 export const auditLogger = {
   /**
    * Logs an audit event.
    * @param userId The ID of the user performing the action.
    * @param userName The name of the user performing the action.
-   * @param event A descriptive name for the event (e.g., "User Login", "Repair Status Update").
-   * @param details An object containing additional context or data for the event.
+   * @param action A description of the action performed (e.g., "User Login", "Repair Status Update").
+   * @param details An object containing additional context for the action.
+   * @param ipAddress (Optional) The IP address from which the action originated.
    */
-  log(userId: string, userName: string, event: string, details: Record<string, any>): void {
+  log: (userId: string, userName: string, action: string, details: Record<string, any>, ipAddress?: string) => {
+    const timestamp = new Date().toISOString()
     const logEntry: AuditLogEntry = {
-      timestamp: new Date().toISOString(),
+      timestamp,
       userId,
       userName,
-      event,
+      action,
       details,
-      ipAddress: "N/A", // Placeholder for demo
-      userAgent: "N/A", // Placeholder for demo
+      ipAddress,
     }
 
-    // In a real application, this would send the logEntry to a database,
-    // a logging service (e.g., Datadog, Sentry, ELK stack), or a file.
-    console.log("AUDIT LOG:", JSON.stringify(logEntry, null, 2))
+    auditLogs.push(logEntry)
+    if (auditLogs.length > MAX_LOGS) {
+      auditLogs.shift() // Remove the oldest log if max limit is reached
+    }
+
+    console.log("AUDIT LOG:", logEntry)
+  },
+
+  /**
+   * Retrieves all current audit logs.
+   * In a real system, this would involve querying the database.
+   * @returns An array of audit log entries.
+   */
+  getLogs: (): AuditLogEntry[] => {
+    return [...auditLogs] // Return a copy to prevent external modification
+  },
+
+  /**
+   * Clears all audit logs.
+   * (For development/testing purposes only, not for production).
+   */
+  clearLogs: () => {
+    auditLogs.length = 0
+    console.log("AUDIT LOGS CLEARED.")
   },
 }
